@@ -1,0 +1,174 @@
+# PROJECT_CONTEXT.md
+
+> Load this file at the start of every development session. It is the single source of
+> truth for what this product is, how it's built, and the conventions every module must
+> follow. Detailed artifacts it summarizes live under `docs/01-product-planning/` and
+> `docs/02-ui-ux-design/`. Architecture, folder structure, database, and API specs
+> (Phases 3–7) will be added here as those phases are completed — this file will be kept
+> up to date as the authoritative index.
+
+## 1. Business Overview
+
+**China Medical and Tourism** is a two-sided marketplace and coordination platform
+connecting international patients with accredited hospitals in China, bundling the
+medical journey with visa support, hotel booking, airport transfers, and interpretation —
+so a patient can book world-class treatment as coordinated as booking a flight and hotel.
+
+Full detail: `docs/01-product-planning/01-business-requirements.md`
+
+## 2. Vision
+
+Become the trusted, single point of accountability for international medical travel to
+China — replacing fragmented, unlicensed "medical broker" arrangements with a transparent,
+digitally coordinated, auditable service, starting with a curated hospital network in
+Beijing, Shanghai, and Guangzhou.
+
+## 3. Target Users
+
+| Role | Summary |
+|---|---|
+| Patient | International patient (or family member booking on their behalf) seeking treatment in China |
+| Hospital Staff | Partner hospital representative managing listings, doctors, and applications |
+| Case Manager | Internal ops staff coordinating each patient's end-to-end journey |
+| Driver / Interpreter | Gig-style logistics partners fulfilling assigned trips/appointments |
+| Hotel Partner | Partner hotel managing inventory and bookings sold through the platform |
+| Platform Admin | Internal super-user: users, finance, content moderation, analytics |
+
+Full detail: `docs/01-product-planning/02-user-stories.md`,
+`docs/01-product-planning/03-user-journeys.md`
+
+## 4. Requirements Index
+
+- Feature list (prioritized P0/P1/P2): `docs/01-product-planning/04-feature-list.md`
+- Functional requirements (FR-*, traceable IDs): `docs/01-product-planning/05-functional-requirements.md`
+- Non-functional requirements (NFR-*: performance, security, compliance):
+  `docs/01-product-planning/06-non-functional-requirements.md`
+- Business rules (BR-*: SLAs, commissions, cancellation policy):
+  `docs/01-product-planning/07-business-rules.md`
+- Privacy Policy (draft — needs legal review before publish):
+  `docs/01-product-planning/08-privacy-policy.md`
+- Terms of Service (draft — needs legal review before publish):
+  `docs/01-product-planning/09-terms-of-service.md`
+- Sitemap, navigation, information architecture:
+  `docs/01-product-planning/10-sitemap-navigation-ia.md`
+
+## 5. Tech Stack (proposed — confirm before Phase 3 build-out)
+
+| Layer | Choice |
+|---|---|
+| Frontend | Next.js + TypeScript + Tailwind CSS + shadcn/ui |
+| Backend | NestJS + TypeScript |
+| Database | PostgreSQL |
+| ORM | Prisma |
+| Authentication | Auth.js or Better Auth, JWT, role-based access control (roles per §3) |
+| Storage | S3-compatible object storage (medical documents encrypted at rest) |
+| Caching | Redis |
+| Payments | Stripe (international) + region-specific rails as needed per target market |
+| Email | Resend |
+| SMS / OTP | Twilio or regional provider |
+| Deployment | Docker + GitHub Actions CI/CD + VPS or cloud provider |
+
+This stack is not yet implemented in this repository — Phase 3 (System Architecture) and
+Phase 4 (Folder Structure) will confirm and formalize it before any module code is
+written.
+
+## 6. UI Design System
+
+- Style guide (color, type, spacing, motion): `docs/02-ui-ux-design/01-style-guide.md`
+- Component library spec: `docs/02-ui-ux-design/02-design-system-components.md`
+- Screen specs (54 screens across public site, patient/hospital/ops/admin/partner
+  portals): `docs/02-ui-ux-design/03-*.md` through `06-*.md`
+- Responsive/mobile guidelines: `docs/02-ui-ux-design/07-responsive-mobile-desktop.md`
+- **Live visual reference (colors, type, components):**
+  `docs/02-ui-ux-design/design-system-preview.html`
+
+Brand tone: "a trusted specialist who also happens to be a great travel concierge" — calm
+clarity over decoration, evidence over adjectives, one primary action per screen.
+
+## 7. Security & Compliance Rules (non-negotiable)
+
+- Never store raw payment card data — delegate to a PCI-DSS Level 1 processor.
+- Encrypt medical documents and passport scans at rest (AES-256) and in transit (TLS 1.2+).
+- Enforce role-based access control at the API layer on every request, not just in the UI.
+- Log and access-control every read of a patient's medical document vault (audit trail).
+- Capture explicit, separate consent before processing medical data (never bundled with
+  general ToS acceptance).
+- Handle cross-border data transfer per PIPL (China) and GDPR-equivalent principles for
+  other target markets.
+- Full detail: `docs/01-product-planning/06-non-functional-requirements.md` §3–4.
+
+## 8. API Conventions
+
+*(To be finalized in Phase 7 — API Specification. Placeholder conventions below apply
+until superseded.)*
+
+- REST, JSON, versioned under `/api/v1/`.
+- Authenticated routes require a bearer JWT; role scope enforced per endpoint.
+- Resource naming: plural nouns (`/patients`, `/cases`, `/hospitals`), nested where
+  ownership is clear (`/cases/:id/documents`).
+- Every mutating endpoint on a "case" object emits a notification event per
+  FR-APP-08/FR-NOTIF-01.
+
+## 9. Database Conventions
+
+*(To be finalized in Phase 6 — Database Design. Placeholder conventions below apply
+until superseded.)*
+
+- Table names: `snake_case`, plural (`patients`, `applications`, `hospitals`).
+- Every table: `id` (UUID), `created_at`, `updated_at`; soft-delete via `deleted_at` where
+  records must be recoverable/auditable (e.g., cases, documents) rather than hard-deleted.
+- Foreign keys explicit and indexed; no implicit joins across service boundaries — see
+  the service-oriented folder structure to be defined in Phase 4.
+
+## 10. Naming Conventions
+
+- Case status vocabulary is fixed and shared across all portals: `Submitted`,
+  `Under Review`, `Info Requested`, `Accepted`, `Declined`, `Completed` — never introduce
+  ad hoc status strings; extend this enum deliberately if a new state is required.
+- Role identifiers: `patient`, `hospital_staff`, `doctor`, `case_manager`, `driver`,
+  `interpreter`, `hotel_partner`, `admin` — used consistently across code, database, and
+  route prefixes (`/app`, `/hospital`, `/ops`, `/partner`, `/admin`).
+- Requirement IDs (`FR-*`, `NFR-*`, `BR-*`) should be referenced in commit messages and PR
+  descriptions when a change implements or modifies a specific requirement, to keep
+  planning docs and code traceable to each other.
+
+## 11. Definition of Done
+
+A module/feature is done when:
+1. It implements the specific `FR-*` requirement(s) it targets, per
+   `05-functional-requirements.md`.
+2. It respects applicable `NFR-*` (security, accessibility, performance) and `BR-*`
+   (business rule) constraints.
+3. UI matches the relevant screen spec and uses only components/tokens defined in the
+   Design System (no one-off styles).
+4. It has automated test coverage for its business logic (unit + integration per
+   NFR-MAINT-02).
+5. It is responsive per `07-responsive-mobile-desktop.md` and passes a basic
+   accessibility check (keyboard nav, screen-reader spot check, WCAG AA contrast).
+6. Sensitive actions are audit-logged where required (NFR-SEC-07).
+7. Documentation (this file and/or module README) is updated if conventions changed.
+
+## 12. Working Session Pattern
+
+Per session, give a single focused task referencing this file plus the specific
+requirement/screen IDs involved, e.g.:
+
+> "Implement the patient registration and OTP verification flow (FR-AUTH-01 through
+> FR-AUTH-03, Screens 18–20). Follow PROJECT_CONTEXT.md conventions."
+
+This keeps each session's output consistent and traceable without re-explaining the whole
+product each time.
+
+## 13. Status of This Document
+
+| Phase | Status |
+|---|---|
+| Phase 1 — Product Planning | ✅ Complete |
+| Phase 2 — UI/UX Design | ✅ Complete (54 screens specified + visual token reference) |
+| Phase 3 — System Architecture | Not started |
+| Phase 4 — Folder Structure | Not started |
+| Phase 5 — Module-by-module build | Not started |
+| Phase 6 — Database Design | Not started (placeholder conventions only, §9) |
+| Phase 7 — API Specification | Not started (placeholder conventions only, §8) |
+| Phase 8 — Testing | Not started |
+| Phase 9 — Deployment | Not started |
