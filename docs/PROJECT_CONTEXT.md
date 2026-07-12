@@ -200,7 +200,7 @@ product each time.
 | Phase 2 — UI/UX Design | ✅ Complete (54 screens specified + visual token reference) |
 | Phase 3 — System Architecture | ✅ Complete (9 docs: overview/diagrams, frontend, backend/API, database, auth/security, storage/caching/search, notifications, observability, deployment/CI-CD) |
 | Phase 4 — Folder Structure | Partial — `apps/web` scaffolded (see §14); services/packages layout not yet defined |
-| Phase 5 — Module-by-module build | Partial — public marketing site live in `apps/web` (21 screens, mock data); authenticated portals (patient/hospital/ops/admin/partner) not started, no real backend/auth/database wired up yet |
+| Phase 5 — Module-by-module build | Partial — public marketing site + Patient portal live in `apps/web` (33 screens, mock data); Hospital/Ops/Admin/Partner portals not started, no real backend/auth/database wired up yet |
 | Phase 6 — Database Design | Not started (placeholder conventions only, §9) |
 | Phase 7 — API Specification | Not started (placeholder conventions only, §8) |
 | Phase 8 — Testing | Not started (no automated tests yet — build/lint pass) |
@@ -208,24 +208,39 @@ product each time.
 
 ## 14. Current Implementation — `apps/web`
 
-A working Next.js (App Router, TypeScript, Tailwind v4) implementation of the **public
-marketing site** lives in `apps/web/`, covering all 21 public screens from
-`docs/02-ui-ux-design/03-screens-marketing-public.md`: home, hospital directory, hospital
-detail, doctor detail, specialties, destinations, how-it-works, pricing, reviews, blog,
-about, partner-with-us, FAQ, contact, privacy policy, terms of service, login, and
-register. It uses the exact color/type tokens from
-`docs/02-ui-ux-design/01-style-guide.md` and a typed mock-data layer
-(`apps/web/src/data/hospitals.ts`) standing in for the backend.
+A working Next.js (App Router, TypeScript, Tailwind v4) implementation lives in
+`apps/web/`, using two route groups so each surface gets the right chrome:
 
-**What this is:** a real, buildable, navigable site demonstrating the design system and
-information architecture end to end — good for stakeholder review and as the frontend
-shell to wire up to a real backend.
+- **`(marketing)` route group** — the public site, all 21 screens from
+  `docs/02-ui-ux-design/03-screens-marketing-public.md`: home, hospital directory,
+  hospital/doctor detail, specialties, destinations, how-it-works, pricing, reviews,
+  blog, about, partner-with-us, FAQ, contact, privacy policy, terms of service, login,
+  register. Uses the public `Header`/`Footer` chrome.
+- **`app/` route group (`/app/*`)** — the Patient Portal, all 12 screens from
+  `docs/02-ui-ux-design/04-screens-patient-dashboard.md`: dashboard, multi-step
+  application wizard, case list, case detail (overview/documents/messages/itinerary/
+  payments tabs), dependents, hotel and airport-transfer booking, payments, reviews,
+  notifications, and settings. Uses a sidebar-navigation chrome
+  (`components/portal/PortalSidebar.tsx` + `PortalTopBar.tsx`) per the design system,
+  and renders as if already logged in as a demo patient (visibly labeled "Demo mode" in
+  the top bar) — there is no real authentication yet, see below.
+
+Both surfaces use the exact color/type tokens from
+`docs/02-ui-ux-design/01-style-guide.md` and typed mock-data layers
+(`apps/web/src/data/hospitals.ts`, `apps/web/src/data/patient.ts`) standing in for the
+backend.
+
+**What this is:** a real, buildable, navigable product demonstrating the design system
+and information architecture end to end for both the public site and a patient's
+day-to-day experience — good for stakeholder review and as the frontend shell to wire up
+to a real backend.
 
 **What this is not yet:** connected to any of the backend/database/auth architecture
-described in `docs/03-architecture/` — forms don't submit anywhere, login/register are
-static UI only, and the authenticated portals (Patient/Hospital/Ops/Admin/Partner,
-screens 22–59) are not built. Wiring those up is Phase 5's remaining, larger scope and
-depends on Phase 4 (full folder structure) and Phase 6/7 (database/API) being completed
-first per the architecture in `docs/03-architecture/`.
+described in `docs/03-architecture/`. Login/register are static UI only, the Application
+Wizard and forms don't persist anywhere, and the Hospital/Ops/Admin/Partner portals
+(screens 37–59) are not built. Wiring the Patient portal to a real backend and building
+the remaining portals is Phase 5's remaining scope, and depends on Phase 4 (full folder
+structure) and Phase 6/7 (database/API) being completed first per
+`docs/03-architecture/`.
 
 Run locally: `cd apps/web && npm install && npm run dev`.
