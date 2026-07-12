@@ -199,9 +199,33 @@ product each time.
 | Phase 1 — Product Planning | ✅ Complete |
 | Phase 2 — UI/UX Design | ✅ Complete (54 screens specified + visual token reference) |
 | Phase 3 — System Architecture | ✅ Complete (9 docs: overview/diagrams, frontend, backend/API, database, auth/security, storage/caching/search, notifications, observability, deployment/CI-CD) |
-| Phase 4 — Folder Structure | Not started |
-| Phase 5 — Module-by-module build | Not started |
+| Phase 4 — Folder Structure | Partial — `apps/web` scaffolded (see §14); services/packages layout not yet defined |
+| Phase 5 — Module-by-module build | Partial — public marketing site live in `apps/web` (21 screens, mock data); authenticated portals (patient/hospital/ops/admin/partner) not started, no real backend/auth/database wired up yet |
 | Phase 6 — Database Design | Not started (placeholder conventions only, §9) |
 | Phase 7 — API Specification | Not started (placeholder conventions only, §8) |
-| Phase 8 — Testing | Not started |
+| Phase 8 — Testing | Not started (no automated tests yet — build/lint pass) |
 | Phase 9 — Deployment | Not started |
+
+## 14. Current Implementation — `apps/web`
+
+A working Next.js (App Router, TypeScript, Tailwind v4) implementation of the **public
+marketing site** lives in `apps/web/`, covering all 21 public screens from
+`docs/02-ui-ux-design/03-screens-marketing-public.md`: home, hospital directory, hospital
+detail, doctor detail, specialties, destinations, how-it-works, pricing, reviews, blog,
+about, partner-with-us, FAQ, contact, privacy policy, terms of service, login, and
+register. It uses the exact color/type tokens from
+`docs/02-ui-ux-design/01-style-guide.md` and a typed mock-data layer
+(`apps/web/src/data/hospitals.ts`) standing in for the backend.
+
+**What this is:** a real, buildable, navigable site demonstrating the design system and
+information architecture end to end — good for stakeholder review and as the frontend
+shell to wire up to a real backend.
+
+**What this is not yet:** connected to any of the backend/database/auth architecture
+described in `docs/03-architecture/` — forms don't submit anywhere, login/register are
+static UI only, and the authenticated portals (Patient/Hospital/Ops/Admin/Partner,
+screens 22–59) are not built. Wiring those up is Phase 5's remaining, larger scope and
+depends on Phase 4 (full folder structure) and Phase 6/7 (database/API) being completed
+first per the architecture in `docs/03-architecture/`.
+
+Run locally: `cd apps/web && npm install && npm run dev`.
