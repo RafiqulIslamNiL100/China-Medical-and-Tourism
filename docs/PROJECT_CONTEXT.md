@@ -200,7 +200,7 @@ product each time.
 | Phase 2 — UI/UX Design | ✅ Complete (54 screens specified + visual token reference) |
 | Phase 3 — System Architecture | ✅ Complete (9 docs: overview/diagrams, frontend, backend/API, database, auth/security, storage/caching/search, notifications, observability, deployment/CI-CD) |
 | Phase 4 — Folder Structure | Partial — `apps/web` scaffolded (see §14); services/packages layout not yet defined |
-| Phase 5 — Module-by-module build | Partial — public marketing site + Patient portal + Hospital portal live in `apps/web` (40 screens, mock data); Ops/Admin/Partner portals not started, no real backend/auth/database wired up yet |
+| Phase 5 — Module-by-module build | Partial — public marketing site + Patient/Hospital/Ops portals live in `apps/web` (43 screens, mock data); Admin console and Partner (Driver/Interpreter/Hotel) portals not started, no real backend/auth/database wired up yet |
 | Phase 6 — Database Design | Not started (placeholder conventions only, §9) |
 | Phase 7 — API Specification | Not started (placeholder conventions only, §8) |
 | Phase 8 — Testing | Not started (no automated tests yet — build/lint pass) |
@@ -233,24 +233,32 @@ A working Next.js (App Router, TypeScript, Tailwind v4) implementation lives in
   demo hospital (Beijing United Family Hospital) — matching Business Rule BR-03's
   hospital-scoped access model, though the scoping itself is not yet enforced by any real
   backend.
+- **`ops/` route group (`/ops/*`)** — the Operations Console, 3 screens from
+  `docs/02-ui-ux-design/05-screens-admin-ops-hospital.md`: case queue (cross-hospital,
+  filterable by My Cases/Urgent/Unassigned, SLA color-coded), ops case detail (internal
+  notes not visible to patient/hospital, plus a driver/interpreter assignment panel), and
+  the assignment board (unassigned-items alert, assign-from-dropdown). Uses its own
+  sidebar chrome (`OpsSidebar.tsx` + `OpsTopBar.tsx`).
 
-All three surfaces use the exact color/type tokens from
+All four surfaces use the exact color/type tokens from
 `docs/02-ui-ux-design/01-style-guide.md` and typed mock-data layers
 (`apps/web/src/data/hospitals.ts`, `apps/web/src/data/patient.ts`,
-`apps/web/src/data/hospitalStaff.ts`) standing in for the backend.
+`apps/web/src/data/hospitalStaff.ts`, `apps/web/src/data/opsConsole.ts`) standing in for
+the backend.
 
 **What this is:** a real, buildable, navigable product demonstrating the design system
 and information architecture end to end for the public site, a patient's day-to-day
-experience, and a hospital staff member's application-review workflow — good for
-stakeholder review and as the frontend shell to wire up to a real backend.
+experience, a hospital staff member's application-review workflow, and internal
+case-manager operations — good for stakeholder review and as the frontend shell to wire
+up to a real backend.
 
 **What this is not yet:** connected to any of the backend/database/auth architecture
 described in `docs/03-architecture/`. Login/register are static UI only, the Application
-Wizard and forms don't persist anywhere, the hospital Accept/Request-Info/Decline
-decision buttons don't change any state, and the Ops/Admin/Partner portals (screens
-44–59) are not built. Wiring the Patient and Hospital portals to a real backend and
-building the remaining portals is Phase 5's remaining scope, and depends on Phase 4
-(full folder structure) and Phase 6/7 (database/API) being completed first per
-`docs/03-architecture/`.
+Wizard and forms don't persist anywhere, the hospital Accept/Request-Info/Decline and ops
+assignment dropdowns don't change any state, and the Admin console and Partner
+(Driver/Interpreter/Hotel) portals (screens 47–59) are not built. Wiring the built
+portals to a real backend and building the remaining ones is Phase 5's remaining scope,
+and depends on Phase 4 (full folder structure) and Phase 6/7 (database/API) being
+completed first per `docs/03-architecture/`.
 
 Run locally: `cd apps/web && npm install && npm run dev`.
