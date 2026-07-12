@@ -2,10 +2,10 @@
 
 > Load this file at the start of every development session. It is the single source of
 > truth for what this product is, how it's built, and the conventions every module must
-> follow. Detailed artifacts it summarizes live under `docs/01-product-planning/` and
-> `docs/02-ui-ux-design/`. Architecture, folder structure, database, and API specs
-> (Phases 3–7) will be added here as those phases are completed — this file will be kept
-> up to date as the authoritative index.
+> follow. Detailed artifacts it summarizes live under `docs/01-product-planning/`,
+> `docs/02-ui-ux-design/`, and `docs/03-architecture/`. Folder structure, database, and
+> API specs (Phases 4, 6, 7) will be added here as those phases are completed — this file
+> will be kept up to date as the authoritative index.
 
 ## 1. Business Overview
 
@@ -52,25 +52,47 @@ Full detail: `docs/01-product-planning/02-user-stories.md`,
 - Sitemap, navigation, information architecture:
   `docs/01-product-planning/10-sitemap-navigation-ia.md`
 
-## 5. Tech Stack (proposed — confirm before Phase 3 build-out)
+## 5. Tech Stack (confirmed in Phase 3 — System Architecture)
 
 | Layer | Choice |
 |---|---|
-| Frontend | Next.js + TypeScript + Tailwind CSS + shadcn/ui |
-| Backend | NestJS + TypeScript |
-| Database | PostgreSQL |
+| Frontend | Next.js (App Router) + TypeScript + Tailwind CSS + shadcn/ui, two apps (`apps/web`, `apps/admin`) sharing a `packages/ui` component library |
+| Backend | NestJS + TypeScript, modular monolith (one module per business domain, see §5b) |
+| Database | PostgreSQL (single instance, module-owned schemas, row-level multi-tenancy) |
 | ORM | Prisma |
-| Authentication | Auth.js or Better Auth, JWT, role-based access control (roles per §3) |
-| Storage | S3-compatible object storage (medical documents encrypted at rest) |
-| Caching | Redis |
+| Authentication | Auth.js or Better Auth, short-lived JWT + rotating refresh token, mandatory 2FA for staff/admin roles |
+| Storage | S3-compatible object storage — separate private `documents` bucket (signed URLs) and public `media` bucket (CDN) |
+| Caching | Redis (cache + BullMQ background job queue) |
+| Search | Postgres full-text search at launch; dedicated search index (e.g., Meilisearch) if/when volume outgrows it |
 | Payments | Stripe (international) + region-specific rails as needed per target market |
 | Email | Resend |
 | SMS / OTP | Twilio or regional provider |
-| Deployment | Docker + GitHub Actions CI/CD + VPS or cloud provider |
+| Deployment | Docker + Terraform (IaC) + CI/CD pipeline, staging auto-deploy / production manual-approval gate |
 
-This stack is not yet implemented in this repository — Phase 3 (System Architecture) and
-Phase 4 (Folder Structure) will confirm and formalize it before any module code is
-written.
+This stack is architecturally defined but not yet implemented in this repository —
+Phase 4 (Folder Structure) translates it into an actual repo layout before module code
+is written.
+
+## 5b. System Architecture Index (Phase 3)
+
+- Overview, component diagram, request-flow diagram, environments:
+  `docs/03-architecture/01-architecture-overview.md`
+- Frontend architecture (rendering strategy, state, i18n, testing):
+  `docs/03-architecture/02-frontend-architecture.md`
+- Backend & API architecture (module boundaries, API conventions, events, background
+  jobs): `docs/03-architecture/03-backend-api-architecture.md`
+- Database architecture (schema ownership, multi-tenancy, backup/DR):
+  `docs/03-architecture/04-database-architecture.md`
+- Authentication, authorization & security architecture:
+  `docs/03-architecture/05-auth-security-architecture.md`
+- Storage, caching & search architecture:
+  `docs/03-architecture/06-storage-caching-search.md`
+- Notification architecture (event-driven dispatch, channels, templates):
+  `docs/03-architecture/07-notification-architecture.md`
+- Observability (logging, metrics, tracing, alerting):
+  `docs/03-architecture/08-observability.md`
+- Deployment, CI/CD & infrastructure:
+  `docs/03-architecture/09-deployment-cicd-infrastructure.md`
 
 ## 6. UI Design System
 
@@ -99,24 +121,35 @@ clarity over decoration, evidence over adjectives, one primary action per screen
 
 ## 8. API Conventions
 
-*(To be finalized in Phase 7 — API Specification. Placeholder conventions below apply
-until superseded.)*
+*(Fixed in Phase 3, see `docs/03-architecture/03-backend-api-architecture.md`; a full
+endpoint-by-endpoint specification is still produced in Phase 7.)*
 
 - REST, JSON, versioned under `/api/v1/`.
-- Authenticated routes require a bearer JWT; role scope enforced per endpoint.
+- Authenticated routes require a bearer JWT; role scope enforced per endpoint, plus
+  tenant-scoping for `hospital_staff`/`hotel_partner`/`driver`/`interpreter` roles.
 - Resource naming: plural nouns (`/patients`, `/cases`, `/hospitals`), nested where
   ownership is clear (`/cases/:id/documents`).
+- Cursor-based pagination for high-growth lists; consistent `{ error: { code, message,
+  details } }` error shape; `Idempotency-Key` header required for endpoints with external
+  side effects (payments, invitation letters).
 - Every mutating endpoint on a "case" object emits a notification event per
-  FR-APP-08/FR-NOTIF-01.
+  FR-APP-08/FR-NOTIF-01, via the internal event bus (never direct provider calls from a
+  business module).
 
 ## 9. Database Conventions
 
-*(To be finalized in Phase 6 — Database Design. Placeholder conventions below apply
-until superseded.)*
+*(Fixed in Phase 3, see `docs/03-architecture/04-database-architecture.md`; full
+entity-relationship schema is produced in Phase 6.)*
 
+- PostgreSQL, single instance, accessed via Prisma; every schema change is a versioned,
+  backward-compatible migration.
 - Table names: `snake_case`, plural (`patients`, `applications`, `hospitals`).
 - Every table: `id` (UUID), `created_at`, `updated_at`; soft-delete via `deleted_at` where
   records must be recoverable/auditable (e.g., cases, documents) rather than hard-deleted.
+- Tables are owned by a single backend module (§5b); other modules never write directly
+  into another module's tables — only through that module's service layer.
+- Multi-tenancy via row-level scoping (`hospital_id`/`partner_id` columns), not
+  per-tenant databases/schemas.
 - Foreign keys explicit and indexed; no implicit joins across service boundaries — see
   the service-oriented folder structure to be defined in Phase 4.
 
@@ -165,7 +198,7 @@ product each time.
 |---|---|
 | Phase 1 — Product Planning | ✅ Complete |
 | Phase 2 — UI/UX Design | ✅ Complete (54 screens specified + visual token reference) |
-| Phase 3 — System Architecture | Not started |
+| Phase 3 — System Architecture | ✅ Complete (9 docs: overview/diagrams, frontend, backend/API, database, auth/security, storage/caching/search, notifications, observability, deployment/CI-CD) |
 | Phase 4 — Folder Structure | Not started |
 | Phase 5 — Module-by-module build | Not started |
 | Phase 6 — Database Design | Not started (placeholder conventions only, §9) |
