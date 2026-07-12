@@ -200,7 +200,7 @@ product each time.
 | Phase 2 — UI/UX Design | ✅ Complete (54 screens specified + visual token reference) |
 | Phase 3 — System Architecture | ✅ Complete (9 docs: overview/diagrams, frontend, backend/API, database, auth/security, storage/caching/search, notifications, observability, deployment/CI-CD) |
 | Phase 4 — Folder Structure | Partial — `apps/web` scaffolded (see §14); services/packages layout not yet defined |
-| Phase 5 — Module-by-module build | Partial — public marketing site + Patient/Hospital/Ops/Admin portals live in `apps/web` (51 screens, mock data); Partner (Driver/Interpreter/Hotel) portals not started, no real backend/auth/database wired up yet |
+| Phase 5 — Module-by-module build | Frontend complete — all 59 screens from Phase 2 are built and navigable in `apps/web` on mock data across all 6 portals; no real backend/auth/database wired up yet (see §14) |
 | Phase 6 — Database Design | Not started (placeholder conventions only, §9) |
 | Phase 7 — API Specification | Not started (placeholder conventions only, §8) |
 | Phase 8 — Testing | Not started (no automated tests yet — build/lint pass) |
@@ -209,7 +209,8 @@ product each time.
 ## 14. Current Implementation — `apps/web`
 
 A working Next.js (App Router, TypeScript, Tailwind v4) implementation lives in
-`apps/web/`, using two route groups so each surface gets the right chrome:
+`apps/web/`. **All 59 screens from Phase 2 are built and navigable**, split across six
+route groups so each surface gets the right chrome:
 
 - **`(marketing)` route group** — the public site, all 21 screens from
   `docs/02-ui-ux-design/03-screens-marketing-public.md`: home, hospital directory,
@@ -246,26 +247,38 @@ A working Next.js (App Router, TypeScript, Tailwind v4) implementation lives in
   ledger), CMS (article publish status), audit log (read-only, immutable per BR-30), and
   platform settings (locales, SLA thresholds, templates). Uses its own sidebar chrome
   (`AdminSidebar.tsx` + `AdminTopBar.tsx`).
+- **`partner/` route group (`/partner/*`)** — the three Partner Portals, 5 screens from
+  `docs/02-ui-ux-design/06-screens-partner-portals.md`: Hotel Partner (dashboard,
+  inventory & rates, bookings with confirm/reject) with its own sidebar chrome
+  (`HotelPartnerSidebar.tsx` + `HotelPartnerTopBar.tsx`), and Driver ("My Trips") /
+  Interpreter ("My Appointments") — both deliberately single-screen, mobile-first apps
+  using a lightweight shared `SimplePartnerHeader.tsx` rather than a full sidebar, per
+  the design spec's emphasis on one-handed, on-the-go use for those roles.
 
-All five surfaces use the exact color/type tokens from
+All six surfaces use the exact color/type tokens from
 `docs/02-ui-ux-design/01-style-guide.md` and typed mock-data layers
 (`apps/web/src/data/hospitals.ts`, `apps/web/src/data/patient.ts`,
 `apps/web/src/data/hospitalStaff.ts`, `apps/web/src/data/opsConsole.ts`,
-`apps/web/src/data/admin.ts`) standing in for the backend.
+`apps/web/src/data/admin.ts`, `apps/web/src/data/partner.ts`) standing in for the
+backend.
 
 **What this is:** a real, buildable, navigable product demonstrating the design system
-and information architecture end to end for the public site, a patient's day-to-day
+and full information architecture end to end — the public site, a patient's day-to-day
 experience, a hospital staff member's application-review workflow, internal
-case-manager operations, and platform administration — good for stakeholder review and
-as the frontend shell to wire up to a real backend.
+case-manager operations, platform administration, and every partner role's task
+surface. Every one of the 59 screens specified in Phase 2 exists and renders correctly;
+this is the complete frontend shell, ready to be wired up to a real backend.
 
-**What this is not yet:** connected to any of the backend/database/auth architecture
-described in `docs/03-architecture/`. Login/register are static UI only, the Application
-Wizard and forms don't persist anywhere, decision/moderation/assignment buttons across
-every portal don't change any state, and the Partner (Driver/Interpreter/Hotel) portals
-(screens 55–59) are not built. Wiring the built portals to a real backend and building
-the remaining ones is Phase 5's remaining scope, and depends on Phase 4 (full folder
-structure) and Phase 6/7 (database/API) being completed first per
-`docs/03-architecture/`.
+**What this is not yet — and this is the real remaining work:** connected to any of the
+backend/database/auth architecture described in `docs/03-architecture/`. There is no
+database, no real authentication, no payment processing, and no persistence anywhere.
+Login/register are static UI only, every "portal" is a fixed demo identity (not a real
+session), and every mutating control across every screen — the Application Wizard,
+hospital Accept/Request-Info/Decline, ops assignment dropdowns, admin moderation
+actions, hotel booking confirm/reject, driver/interpreter "Mark Complete" — is
+non-functional UI that doesn't change any state. Turning this frontend into a working
+product requires Phase 4 (full folder structure for the backend services), Phase 6
+(database design), Phase 7 (API specification), and then actually implementing each
+module's backend per `docs/03-architecture/` and wiring these existing screens to it.
 
 Run locally: `cd apps/web && npm install && npm run dev`.
