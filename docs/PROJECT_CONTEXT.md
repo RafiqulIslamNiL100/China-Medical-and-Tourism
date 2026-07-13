@@ -425,7 +425,16 @@ documented in-code as swappable for the real thing without touching any caller:
   (`@nestjs/cli`'s transitive deps — webpack, inquirer, tmp), not runtime dependencies;
   fixing requires a `@nestjs/cli` v10→v11 major bump, deliberately deferred rather than
   done reflexively.
-- No Dockerfile, CI pipeline, or deployment config for `services/api` yet (Phase 9).
+- No CI pipeline yet. A production `Dockerfile` (`services/api/Dockerfile`) and a real
+  `GET /health` endpoint (`{status, timestamp}`, checks DB connectivity, excluded from
+  the `/v1` prefix so it matches most hosts' default health-check path) now exist and
+  were verified locally by running the exact commands the container runs — `npm run
+  build --workspace=services/api`, `prisma migrate deploy` (confirmed idempotent), and
+  `node services/api/dist/main.js` from the repo root — but the image itself has not
+  been Docker-built or deployed anywhere (no Docker daemon in this sandbox). See
+  `DEPLOYMENT.md` at the repo root for the actual deploy steps (Railway or equivalent)
+  and the honest list of what's still mocked once it's live (ephemeral local-disk
+  storage, mock payment processor).
 - Frontend wiring is a deliberately scoped vertical slice (auth + hospitals +
   application flow), not all 59 screens — see §14 for the exact list of what's wired
   versus still on mock data.
