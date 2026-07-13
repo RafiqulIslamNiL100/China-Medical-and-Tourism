@@ -1,0 +1,799 @@
+// China Medical and Tourism — Database Schema (Phase 6)
+//
+// Implements the conventions fixed in docs/03-architecture/04-database-architecture.md:
+// module-owned tables, UUID primary keys, createdAt/updatedAt on every table, soft
+// deletes (deletedAt) on records that must be recoverable/auditable, row-level
+// multi-tenancy (hospitalId / partnerId columns), and an append-only AuditLog.
+//
+// Reference doc: docs/06-database-design/02-schema-reference.md (field-by-field detail,
+// FR-*/BR-* traceability). ERD: docs/06-database-design/01-entity-relationship-overview.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Shared enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  patient
+  hospital_staff
+  doctor
+  case_manager
+  driver
+  interpreter
+  hotel_partner
+  admin
+}
+
+enum UserStatus {
+  Active
+  Deactivated
+}
+
+enum CaseStatus {
+  Submitted
+  UnderReview
+  InfoRequested
+  Accepted
+  Declined
+  Completed
+}
+
+enum DocumentCategory {
+  MedicalRecords
+  IdentityDocuments
+  VisaDocuments
+}
+
+enum DocumentStatus {
+  NotUploaded
+  Uploaded
+  Verified
+  Rejected
+}
+
+enum HospitalListingStatus {
+  Draft
+  PendingApproval
+  Published
+  Rejected
+}
+
+enum PackageStatus {
+  Draft
+  Active
+  Archived
+}
+
+enum HotelBookingStatus {
+  Pending
+  Confirmed
+  Rejected
+  Cancelled
+}
+
+enum TransferDirection {
+  Arrival
+  Departure
+}
+
+enum ServiceAssignmentStatus {
+  Requested
+  Assigned
+  Completed
+  Cancelled
+}
+
+enum InvoiceStatus {
+  Due
+  Paid
+  Refunded
+  Cancelled
+}
+
+enum PartnerType {
+  Hospital
+  Hotel
+  Transport
+}
+
+enum ArticleStatus {
+  Draft
+  Published
+}
+
+enum ReviewStatus {
+  Pending
+  Approved
+  Rejected
+  Redacted
+}
+
+enum NotificationChannel {
+  Email
+  SMS
+  InApp
+}
+
+// ---------------------------------------------------------------------------
+// Auth module — owns: users, sessions
+// ---------------------------------------------------------------------------
+
+model User {
+  id               String     @id @default(uuid())
+  email            String     @unique
+  phone            String?    @unique
+  passwordHash     String
+  role             UserRole
+  status           UserStatus @default(Active)
+  twoFactorEnabled Boolean    @default(false)
+  twoFactorSecret  String?
+  lastLoginAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  sessions Session[]
+
+  // Role-specific profile relations (exactly one populated, matching `role`)
+  patientProfile       Patient?
+  hospitalStaffProfile HospitalStaff?
+  driverProfile        Driver?
+  interpreterProfile   Interpreter?
+  hotelPartnerProfile  HotelPartner?
+
+  assignedCases     Application[]            @relation("CaseManager")
+  caseMessages      CaseMessage[]
+  caseStatusChanges CaseStatusHistory[]
+  verifiedDocuments DocumentChecklistItem[]  @relation("DocumentVerifiedBy")
+  issuedInvitations InvitationLetter[]
+  moderatedReviews  Review[]                 @relation("ReviewModeratedBy")
+  authoredArticles  Article[]
+  processedRefunds  Refund[]
+  auditLogEntries   AuditLog[]
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
+
+  @@index([role])
+}
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String
+  refreshTokenHash String    @unique
+  userAgent        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Patient module — owns: patients, dependents
+// ---------------------------------------------------------------------------
+
+model Patient {
+  id                      String   @id @default(uuid())
+  userId                  String   @unique
+  fullName                String
+  phone                   String?
+  country                 String?
+  passportNumberEncrypted String? // application-layer envelope-encrypted, per NFR-SEC-02/05-auth-security-architecture.md §3
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dependents   Dependent[]
+  applications Application[]
+  reviews      Review[]
+
+  @@index([userId])
+}
+
+model Dependent {
+  id                      String   @id @default(uuid())
+  patientId               String
+  fullName                String
+  relationship            String
+  dateOfBirth             DateTime
+  passportNumberEncrypted String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  patient      Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([patientId])
+}
+
+// ---------------------------------------------------------------------------
+// Hospital module — owns: hospitals, departments, doctors, treatment_packages
+// ---------------------------------------------------------------------------
+
+model City {
+  slug    String  @id
+  name    String
+  tagline String?
+  climate String?
+
+  hospitals Hospital[]
+  hotels    Hotel[]
+}
+
+model Specialty {
+  slug  String  @id
+  name  String
+  blurb String?
+
+  doctors           Doctor[]
+  treatmentPackages TreatmentPackage[]
+}
+
+model Hospital {
+  id             String                @id @default(uuid())
+  slug           String                @unique
+  name           String
+  citySlug       String
+  description    String
+  priceTier      String // "$$" | "$$$" | "$$$$" — small fixed vocabulary, not worth a table
+  accreditations String[]
+  languages      String[]
+  facilities     String[]
+  rating         Decimal               @default(0) @db.Decimal(2, 1)
+  reviewCount    Int                   @default(0)
+  status         HospitalListingStatus @default(Draft)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  city            City                     @relation(fields: [citySlug], references: [slug])
+  departments     Department[]
+  doctors         Doctor[]
+  packages        TreatmentPackage[]
+  staff           HospitalStaff[]
+  applications    Application[]
+  reviews         Review[]
+  moderationQueue HospitalModerationItem[]
+  commissionRate  CommissionRate[]
+
+  @@index([citySlug])
+  @@index([status])
+}
+
+model HospitalStaff {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  hospitalId String
+  title      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+
+  @@index([hospitalId])
+}
+
+model Department {
+  id         String @id @default(uuid())
+  hospitalId String
+  name       String
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([hospitalId])
+}
+
+model Doctor {
+  id              String   @id @default(uuid())
+  hospitalId      String
+  slug            String
+  name            String
+  specialtySlug   String
+  credentials     String
+  yearsExperience Int
+  languages       String[]
+  bio             String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  hospital     Hospital      @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  specialty    Specialty     @relation(fields: [specialtySlug], references: [slug])
+  applications Application[]
+
+  @@unique([hospitalId, slug])
+  @@index([specialtySlug])
+}
+
+model TreatmentPackage {
+  id            String        @id @default(uuid())
+  hospitalId    String
+  name          String
+  specialtySlug String
+  description   String
+  priceMinUsd   Decimal       @db.Decimal(10, 2)
+  priceMaxUsd   Decimal       @db.Decimal(10, 2)
+  includes      String[]
+  status        PackageStatus @default(Draft)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  hospital  Hospital  @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  specialty Specialty @relation(fields: [specialtySlug], references: [slug])
+
+  @@index([hospitalId])
+  @@index([specialtySlug])
+}
+
+// Hospital listing/profile changes awaiting Admin approval (FR-HOSP-05, Screen 49)
+model HospitalModerationItem {
+  id            String    @id @default(uuid())
+  hospitalId    String
+  changeSummary String
+  submittedAt   DateTime  @default(now())
+  resolvedAt    DateTime?
+  approved      Boolean?
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@index([hospitalId])
+}
+
+// ---------------------------------------------------------------------------
+// Booking module — owns: applications (cases), case_status_history, case_messages
+// ---------------------------------------------------------------------------
+
+model Application {
+  id                 String     @id @default(uuid())
+  refNumber          String     @unique
+  patientId          String
+  dependentId        String?
+  hospitalId         String
+  doctorId           String?
+  specialtySlug      String
+  status             CaseStatus @default(Submitted)
+  conditionSummary   String?
+  medications        String?
+  allergies          String?
+  treatmentPlan      String?
+  costEstimateMinUsd Decimal?   @db.Decimal(10, 2)
+  costEstimateMaxUsd Decimal?   @db.Decimal(10, 2)
+  caseManagerUserId  String?
+  submittedAt        DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  patient     Patient    @relation(fields: [patientId], references: [id])
+  dependent   Dependent? @relation(fields: [dependentId], references: [id])
+  hospital    Hospital   @relation(fields: [hospitalId], references: [id])
+  doctor      Doctor?    @relation(fields: [doctorId], references: [id])
+  caseManager User?      @relation("CaseManager", fields: [caseManagerUserId], references: [id])
+
+  statusHistory       CaseStatusHistory[]
+  messages            CaseMessage[]
+  documents           DocumentChecklistItem[]
+  invitationLetters   InvitationLetter[]
+  hotelBookings       HotelBooking[]
+  transferRequests    TransferRequest[]
+  interpreterSessions InterpreterAssignment[]
+  invoices            Invoice[]
+  review              Review?
+  internalNotes       CaseInternalNote[]
+
+  @@index([patientId])
+  @@index([hospitalId])
+  @@index([caseManagerUserId])
+  @@index([status])
+}
+
+model CaseStatusHistory {
+  id              String     @id @default(uuid())
+  applicationId   String
+  status          CaseStatus
+  note            String?
+  changedByUserId String?
+  createdAt       DateTime   @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy   User?       @relation(fields: [changedByUserId], references: [id])
+
+  @@index([applicationId])
+}
+
+model CaseMessage {
+  id            String    @id @default(uuid())
+  applicationId String
+  senderUserId  String
+  body          String
+  createdAt     DateTime  @default(now())
+  readAt        DateTime?
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  sender      User        @relation(fields: [senderUserId], references: [id])
+
+  @@index([applicationId])
+}
+
+// Ops-only notes — never exposed to patient/hospital-scoped queries (Screen 45)
+model CaseInternalNote {
+  id            String   @id @default(uuid())
+  applicationId String
+  authorUserId  String
+  note          String
+  createdAt     DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+// ---------------------------------------------------------------------------
+// Visa module — owns: documents, document_checklist_items, invitation_letters
+// ---------------------------------------------------------------------------
+
+model DocumentChecklistItem {
+  id               String           @id @default(uuid())
+  applicationId    String
+  name             String
+  category         DocumentCategory
+  status           DocumentStatus   @default(NotUploaded)
+  note             String?
+  fileStorageKey   String? // reference into the private `documents` object-storage bucket, not a direct file
+  uploadedAt       DateTime?
+  verifiedByUserId String?
+  verifiedAt       DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  verifiedBy  User?       @relation("DocumentVerifiedBy", fields: [verifiedByUserId], references: [id])
+
+  @@index([applicationId])
+}
+
+model InvitationLetter {
+  id              String   @id @default(uuid())
+  applicationId   String
+  fileStorageKey  String
+  templateVersion String
+  issuedByUserId  String
+  issuedAt        DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  issuedBy    User        @relation(fields: [issuedByUserId], references: [id])
+
+  @@index([applicationId])
+}
+
+// ---------------------------------------------------------------------------
+// Hotel module — owns: hotels, hotel_rooms, hotel_bookings
+// ---------------------------------------------------------------------------
+
+model HotelPartner {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hotels Hotel[]
+}
+
+model Hotel {
+  id             String   @id @default(uuid())
+  hotelPartnerId String
+  name           String
+  citySlug       String
+  address        String?
+  rating         Decimal  @default(0) @db.Decimal(2, 1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  partner        HotelPartner     @relation(fields: [hotelPartnerId], references: [id])
+  city           City             @relation(fields: [citySlug], references: [slug])
+  roomTypes      HotelRoomType[]
+  bookings       HotelBooking[]
+  commissionRate CommissionRate[]
+
+  @@index([hotelPartnerId])
+  @@index([citySlug])
+}
+
+model HotelRoomType {
+  id          String   @id @default(uuid())
+  hotelId     String
+  name        String
+  roomCount   Int
+  baseRateUsd Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  hotel    Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  bookings HotelBooking[]
+
+  @@index([hotelId])
+}
+
+model HotelBooking {
+  id            String             @id @default(uuid())
+  hotelId       String
+  roomTypeId    String
+  applicationId String?
+  guestName     String
+  checkIn       DateTime
+  checkOut      DateTime
+  status        HotelBookingStatus @default(Pending)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  deletedAt     DateTime?
+
+  hotel       Hotel         @relation(fields: [hotelId], references: [id])
+  roomType    HotelRoomType @relation(fields: [roomTypeId], references: [id])
+  application Application?  @relation(fields: [applicationId], references: [id])
+
+  @@index([hotelId])
+  @@index([applicationId])
+}
+
+// ---------------------------------------------------------------------------
+// Transport module — owns: transfer_requests, drivers, interpreter_assignments,
+// interpreters
+// ---------------------------------------------------------------------------
+
+model Driver {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  fullName  String
+  phone     String?
+  createdAt DateTime @default(now())
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transfers TransferRequest[]
+}
+
+model Interpreter {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  fullName  String
+  languages String[]
+  createdAt DateTime @default(now())
+
+  user     User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions InterpreterAssignment[]
+}
+
+model TransferRequest {
+  id             String                  @id @default(uuid())
+  applicationId  String
+  direction      TransferDirection
+  flightNumber   String?
+  scheduledAt    DateTime
+  pickupLocation String
+  driverId       String?
+  status         ServiceAssignmentStatus @default(Requested)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  deletedAt      DateTime?
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  driver      Driver?     @relation(fields: [driverId], references: [id])
+
+  @@index([applicationId])
+  @@index([driverId])
+}
+
+model InterpreterAssignment {
+  id              String                  @id @default(uuid())
+  applicationId   String
+  interpreterId   String?
+  hospitalVisitAt DateTime
+  department      String?
+  note            String?
+  status          ServiceAssignmentStatus @default(Requested)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  deletedAt       DateTime?
+
+  application Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interpreter Interpreter? @relation(fields: [interpreterId], references: [id])
+
+  @@index([applicationId])
+  @@index([interpreterId])
+}
+
+// ---------------------------------------------------------------------------
+// Payment module — owns: payments, invoices, refunds, commission_rates
+// ---------------------------------------------------------------------------
+
+model Invoice {
+  id            String        @id @default(uuid())
+  applicationId String
+  description   String
+  amountUsd     Decimal       @db.Decimal(10, 2)
+  status        InvoiceStatus @default(Due)
+  dueDate       DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  application Application @relation(fields: [applicationId], references: [id])
+  payments    Payment[]
+
+  @@index([applicationId])
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  amountUsd   Decimal  @db.Decimal(10, 2)
+  provider    String // e.g. "stripe"
+  providerRef String // idempotency / provider transaction reference
+  paidAt      DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id])
+  refunds Refund[]
+
+  @@unique([provider, providerRef])
+  @@index([invoiceId])
+}
+
+model Refund {
+  id                String   @id @default(uuid())
+  paymentId         String
+  amountUsd         Decimal  @db.Decimal(10, 2)
+  reason            String
+  processedByUserId String
+  createdAt         DateTime @default(now())
+
+  payment     Payment @relation(fields: [paymentId], references: [id])
+  processedBy User    @relation(fields: [processedByUserId], references: [id])
+
+  @@index([paymentId])
+}
+
+model CommissionRate {
+  id          String      @id @default(uuid())
+  partnerType PartnerType
+  hospitalId  String?
+  hotelId     String?
+  rate        Decimal     @db.Decimal(4, 3) // e.g. 0.120 = 12.0%
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+
+  hospital Hospital? @relation(fields: [hospitalId], references: [id])
+  hotel    Hotel?    @relation(fields: [hotelId], references: [id])
+
+  @@index([partnerType])
+}
+
+// ---------------------------------------------------------------------------
+// CMS module — owns: articles, destination_guides
+// ---------------------------------------------------------------------------
+
+model Article {
+  id           String        @id @default(uuid())
+  slug         String        @unique
+  title        String
+  excerpt      String?
+  body         String
+  category     String?
+  authorUserId String
+  status       ArticleStatus @default(Draft)
+  publishedAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  author User @relation(fields: [authorUserId], references: [id])
+
+  @@index([status])
+}
+
+model DestinationGuide {
+  id        String   @id @default(uuid())
+  citySlug  String   @unique
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Reviews & Trust — owns: reviews (FR-REVIEW-*)
+// ---------------------------------------------------------------------------
+
+model Review {
+  id                String       @id @default(uuid())
+  applicationId     String       @unique // one review per completed case, per BR-20
+  patientId         String
+  hospitalId        String
+  rating            Int // 1-5
+  text              String
+  status            ReviewStatus @default(Pending)
+  moderatedByUserId String?
+  moderatedAt       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  deletedAt         DateTime?
+
+  application Application @relation(fields: [applicationId], references: [id])
+  patient     Patient     @relation(fields: [patientId], references: [id])
+  hospital    Hospital    @relation(fields: [hospitalId], references: [id])
+  moderatedBy User?       @relation("ReviewModeratedBy", fields: [moderatedByUserId], references: [id])
+
+  @@index([hospitalId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Notification module — owns: notifications, notification_preferences
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  category  String
+  channel   NotificationChannel
+  linkUrl   String?
+  readAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
+}
+
+model NotificationPreference {
+  id           String  @id @default(uuid())
+  userId       String
+  category     String
+  emailEnabled Boolean @default(true)
+  smsEnabled   Boolean @default(false)
+  inAppEnabled Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+}
+
+// ---------------------------------------------------------------------------
+// Admin module — owns: audit_logs, platform_settings
+// ---------------------------------------------------------------------------
+
+// Append-only per NFR-SEC-07 / BR-30 — application layer must never issue
+// UPDATE or DELETE against this table.
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String?
+  actorLabel  String // denormalized actor name/"System", survives actor deletion
+  action      String
+  targetType  String
+  targetId    String?
+  targetLabel String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id])
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

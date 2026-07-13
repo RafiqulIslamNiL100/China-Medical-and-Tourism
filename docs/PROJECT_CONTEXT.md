@@ -138,18 +138,24 @@ endpoint-by-endpoint specification is still produced in Phase 7.)*
 
 ## 9. Database Conventions
 
-*(Fixed in Phase 3, see `docs/03-architecture/04-database-architecture.md`; full
-entity-relationship schema is produced in Phase 6.)*
+*(Fixed in Phase 3 conceptually, see `docs/03-architecture/04-database-architecture.md`;
+implemented as a real, validated schema in Phase 6 — see §15. One convention below was
+revised from the original Phase 3 placeholder to match what the actual schema does.)*
 
 - PostgreSQL, single instance, accessed via Prisma; every schema change is a versioned,
   backward-compatible migration.
-- Table names: `snake_case`, plural (`patients`, `applications`, `hospitals`).
-- Every table: `id` (UUID), `created_at`, `updated_at`; soft-delete via `deleted_at` where
-  records must be recoverable/auditable (e.g., cases, documents) rather than hard-deleted.
+- Model/table names: Prisma-idiomatic PascalCase singular (`Application`, `Hospital`,
+  `DocumentChecklistItem`), matching the actual Postgres identifiers Prisma generates
+  by default — revised from the Phase 3 placeholder's `snake_case` plural guess, which
+  the real schema doesn't follow. Prisma Client accessors are camelCase
+  (`prisma.application.findMany()`).
+- Every table: `id` (UUID), `createdAt`, `updatedAt`; soft-delete via `deletedAt` where
+  records must be recoverable/auditable (e.g., `Application`, `DocumentChecklistItem`,
+  `Invoice`, `Review`) rather than hard-deleted.
 - Tables are owned by a single backend module (§5b); other modules never write directly
   into another module's tables — only through that module's service layer.
-- Multi-tenancy via row-level scoping (`hospital_id`/`partner_id` columns), not
-  per-tenant databases/schemas.
+- Multi-tenancy via row-level scoping (`hospitalId` on `HospitalStaff`, `hotelPartnerId`
+  on `Hotel`, etc.), not per-tenant databases/schemas.
 - Foreign keys explicit and indexed; no implicit joins across service boundaries — see
   the service-oriented folder structure to be defined in Phase 4.
 
@@ -199,9 +205,9 @@ product each time.
 | Phase 1 — Product Planning | ✅ Complete |
 | Phase 2 — UI/UX Design | ✅ Complete (54 screens specified + visual token reference) |
 | Phase 3 — System Architecture | ✅ Complete (9 docs: overview/diagrams, frontend, backend/API, database, auth/security, storage/caching/search, notifications, observability, deployment/CI-CD) |
-| Phase 4 — Folder Structure | Partial — `apps/web` scaffolded (see §14); services/packages layout not yet defined |
+| Phase 4 — Folder Structure | Partial — `apps/web` scaffolded (see §14) and `database/` added (§15); backend services/packages layout not yet defined |
 | Phase 5 — Module-by-module build | Frontend complete — all 59 screens from Phase 2 are built and navigable in `apps/web` on mock data across all 6 portals; no real backend/auth/database wired up yet (see §14) |
-| Phase 6 — Database Design | Not started (placeholder conventions only, §9) |
+| Phase 6 — Database Design | ✅ Complete — 40-model Prisma schema (`database/prisma/schema.prisma`, validated), ERD, and field-by-field schema reference with FR-\*/BR-\* traceability (see §15) |
 | Phase 7 — API Specification | Not started (placeholder conventions only, §8) |
 | Phase 8 — Testing | Not started (no automated tests yet — build/lint pass) |
 | Phase 9 — Deployment | Not started |
@@ -269,16 +275,37 @@ case-manager operations, platform administration, and every partner role's task
 surface. Every one of the 59 screens specified in Phase 2 exists and renders correctly;
 this is the complete frontend shell, ready to be wired up to a real backend.
 
-**What this is not yet — and this is the real remaining work:** connected to any of the
-backend/database/auth architecture described in `docs/03-architecture/`. There is no
-database, no real authentication, no payment processing, and no persistence anywhere.
-Login/register are static UI only, every "portal" is a fixed demo identity (not a real
-session), and every mutating control across every screen — the Application Wizard,
-hospital Accept/Request-Info/Decline, ops assignment dropdowns, admin moderation
-actions, hotel booking confirm/reject, driver/interpreter "Mark Complete" — is
-non-functional UI that doesn't change any state. Turning this frontend into a working
-product requires Phase 4 (full folder structure for the backend services), Phase 6
-(database design), Phase 7 (API specification), and then actually implementing each
-module's backend per `docs/03-architecture/` and wiring these existing screens to it.
+**What this is not yet — and this is the real remaining work:** connected to any real
+backend. A validated database schema now exists (§15) but isn't applied to a running
+database or consumed by any code — there is still no real authentication, no payment
+processing, and no persistence anywhere in `apps/web`. Login/register are static UI
+only, every "portal" is a fixed demo identity (not a real session), and every mutating
+control across every screen — the Application Wizard, hospital
+Accept/Request-Info/Decline, ops assignment dropdowns, admin moderation actions, hotel
+booking confirm/reject, driver/interpreter "Mark Complete" — is non-functional UI that
+doesn't change any state. Turning this frontend into a working product requires Phase 4
+(full folder structure for the backend services), Phase 7 (API specification), and then
+actually implementing each module's backend per `docs/03-architecture/` and this
+schema, and wiring these existing screens to it.
 
 Run locally: `cd apps/web && npm install && npm run dev`.
+
+## 15. Database — `database/`
+
+Phase 6 (Database Design) is complete: a full, Prisma-validated schema lives at
+`database/prisma/schema.prisma` — 40 models covering every module identified in
+`docs/03-architecture/04-database-architecture.md` §3 (Auth, Patient, Hospital,
+Booking, Visa, Hotel, Transport, Payment, CMS, Reviews, Notification, Admin).
+
+- ERD (grouped by module, since one all-tables diagram isn't readable):
+  `docs/06-database-design/01-entity-relationship-overview.md`
+- Field-by-field reference with FR-\*/BR-\* traceability:
+  `docs/06-database-design/02-schema-reference.md`
+- Setup/usage: `database/README.md`
+
+**Validated, not yet applied:** `npx prisma validate` passes against this schema
+(Prisma 6 — see the note in §9 about Prisma 7's breaking config change), but no
+migration has been run against a real Postgres instance, no Prisma Client has been
+generated into `apps/web`, and nothing in the frontend queries it. That wiring — plus
+the backend services themselves — is Phase 7 (API Specification) and the subsequent
+module-by-module backend implementation.
