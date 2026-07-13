@@ -3,6 +3,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { StorageService } from "./storage/storage.service";
+import { EmailService } from "./email/email.service";
 import { NotificationService } from "./notifications/notification.service";
 import { AuditService } from "./audit/audit.service";
 import { MockPaymentProcessor } from "./payments/mock-payment-processor.service";
@@ -25,6 +26,7 @@ import { HttpExceptionFilter } from "./filters/http-exception.filter";
   ],
   providers: [
     StorageService,
+    EmailService,
     NotificationService,
     AuditService,
     MockPaymentProcessor,
@@ -32,6 +34,6 @@ import { HttpExceptionFilter } from "./filters/http-exception.filter";
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],
-  exports: [JwtModule, StorageService, NotificationService, AuditService, MockPaymentProcessor],
+  exports: [JwtModule, StorageService, EmailService, NotificationService, AuditService, MockPaymentProcessor],
 })
 export class CommonModule {}

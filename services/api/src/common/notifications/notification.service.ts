@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { EmailService } from "../email/email.service";
 import { NotificationChannel } from "@prisma/client";
 
 export interface NotifyInput {
@@ -14,15 +15,17 @@ export interface NotifyInput {
  * Central notification dispatch, per docs/03-architecture/07-notification-architecture.md
  * §1 — every module emits through here rather than calling an email/SMS provider
  * directly. Always writes the in-app Notification row (real, queryable by the
- * Notifications module); the "Email" send is a console-log stand-in for Resend/Twilio,
- * since no provider credentials exist in this environment. Swap `dispatchEmail` for a
- * real provider call without touching any caller.
+ * Notifications module); the email send goes through EmailService (real Resend once
+ * RESEND_API_KEY is configured, console-log stand-in otherwise — see email.service.ts).
  */
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger("NotificationDispatch");
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   async notify(input: NotifyInput): Promise<void> {
     const preference = await this.prisma.notificationPreference.findUnique({
@@ -48,6 +51,12 @@ export class NotificationService {
   }
 
   private async dispatchEmail(input: NotifyInput): Promise<void> {
-    this.logger.log(`[dev email stand-in] to user ${input.userId}: "${input.title}" — ${input.body}`);
+    const user = await this.prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } });
+    if (!user) {
+      this.logger.warn(`Cannot email notification "${input.title}" — user ${input.userId} not found.`);
+      return;
+    }
+
+    await this.email.send({ to: user.email, subject: input.title, text: input.body });
   }
 }
