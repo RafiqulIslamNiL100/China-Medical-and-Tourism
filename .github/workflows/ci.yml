@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  web:
+    name: Build frontend (apps/web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build Next.js app
+        working-directory: apps/web
+        env:
+          # Dynamic (server-rendered) routes fetch at request time, not build time,
+          # so any syntactically valid URL suffices here.
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/v1
+        run: npx next build
+
+  api:
+    name: Build + smoke-test backend (services/api)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cmt_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cmt_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate schema and apply migrations
+        run: |
+          npx prisma validate --schema database/prisma/schema.prisma
+          npx prisma migrate deploy --schema database/prisma/schema.prisma
+          npx prisma generate --schema database/prisma/schema.prisma
+      - name: Build API
+        run: npm run build --workspace=services/api
+      - name: Seed demo data
+        env:
+          SEED_DEMO_PASSWORD: ci-only-password-1
+        run: node database/prisma/seed.js
+      - name: Run smoke tests
+        working-directory: services/api
+        run: npm test

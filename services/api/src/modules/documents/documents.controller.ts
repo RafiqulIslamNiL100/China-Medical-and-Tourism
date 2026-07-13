@@ -41,7 +41,9 @@ export class DocumentsController {
 }
 
 /**
- * Resolves the dev-adapter download URLs produced by StorageService.resolveDownloadUrl.
+ * Resolves the local-disk-mode download URLs produced by StorageService.getDownloadUrl.
+ * In S3 mode this route is unused — download URLs are presigned S3 GETs served by the
+ * provider directly.
  * In production this whole controller is replaced by real short-lived signed S3 URLs
  * and the API never proxies file bytes itself — see
  * docs/03-architecture/06-storage-caching-search.md §1. This dev stand-in requires a

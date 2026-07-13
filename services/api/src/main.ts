@@ -1,12 +1,28 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { ValidationPipe } from "@nestjs/common";
+import helmet from "helmet";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Behind Railway's (or any PaaS) reverse proxy — needed so req.ip reflects the real
+  // client for rate limiting rather than the proxy's address.
+  app.set("trust proxy", 1);
+
+  app.use(helmet());
   app.setGlobalPrefix("v1", { exclude: ["health"] });
-  app.enableCors({ origin: true, credentials: true });
+
+  // CORS_ORIGINS: comma-separated allowlist (e.g. "https://china-medical-and-tourism.vercel.app").
+  // Unset = allow all origins, for local development only — always set it in production.
+  const corsOrigins = process.env.CORS_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean);
+  app.enableCors({
+    origin: corsOrigins && corsOrigins.length > 0 ? corsOrigins : true,
+    credentials: true,
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

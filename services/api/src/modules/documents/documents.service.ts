@@ -1,6 +1,4 @@
 import { Injectable, StreamableFile } from "@nestjs/common";
-import { createReadStream } from "fs";
-import { stat } from "fs/promises";
 import { DocumentStatus, InvoiceStatus, UserRole } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { StorageService } from "../../common/storage/storage.service";
@@ -23,7 +21,7 @@ export class DocumentsService {
       where: { applicationId: application.id, deletedAt: null },
       orderBy: { createdAt: "asc" },
     });
-    return items.map((item) => this.withDownloadUrl(item));
+    return Promise.all(items.map((item) => this.withDownloadUrl(item)));
   }
 
   async upload(user: AuthenticatedUser, applicationId: string, documentId: string, file: Express.Multer.File) {
@@ -41,13 +39,12 @@ export class DocumentsService {
   }
 
   async downloadFile(key: string): Promise<StreamableFile> {
-    const path = this.storage.filePath(key);
     try {
-      await stat(path);
+      const stream = await this.storage.download(key);
+      return new StreamableFile(stream);
     } catch {
       throw AppException.notFound("DOCUMENT_FILE_NOT_FOUND", "File not found.");
     }
-    return new StreamableFile(createReadStream(path));
   }
 
   async verify(user: AuthenticatedUser, applicationId: string, documentId: string, dto: VerifyDocumentDto) {
@@ -120,7 +117,7 @@ export class DocumentsService {
       });
     }
 
-    return { ...letter, downloadUrl: this.storage.resolveDownloadUrl(letter.fileStorageKey) };
+    return { ...letter, downloadUrl: await this.storage.getDownloadUrl(letter.fileStorageKey) };
   }
 
   private renderInvitationLetter(refNumber: string): string {
@@ -139,8 +136,11 @@ export class DocumentsService {
     ].join("\n");
   }
 
-  private withDownloadUrl<T extends { fileStorageKey: string | null }>(item: T) {
-    return { ...item, downloadUrl: item.fileStorageKey ? this.storage.resolveDownloadUrl(item.fileStorageKey) : null };
+  private async withDownloadUrl<T extends { fileStorageKey: string | null }>(item: T) {
+    return {
+      ...item,
+      downloadUrl: item.fileStorageKey ? await this.storage.getDownloadUrl(item.fileStorageKey) : null,
+    };
   }
 
   private async requireItem(applicationId: string, documentId: string) {
