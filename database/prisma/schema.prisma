@@ -658,8 +658,9 @@ model Payment {
   id          String   @id @default(uuid())
   invoiceId   String
   amountUsd   Decimal  @db.Decimal(10, 2)
-  provider    String // e.g. "stripe"
-  providerRef String // idempotency / provider transaction reference
+  provider    String // "stripe" once STRIPE_SECRET_KEY is configured, "mock" otherwise
+  providerRef String // our own Idempotency-Key — used for dedup lookups, not the gateway's transaction id
+  gatewayRef  String? // real gateway transaction reference (e.g. Stripe PaymentIntent id), set only in Stripe mode; used to issue real refunds
   paidAt      DateTime @default(now())
   createdAt   DateTime @default(now())
 
@@ -677,6 +678,7 @@ model Refund {
   reason            String
   processedByUserId String
   idempotencyKey    String   @unique
+  gatewayRef        String? // real gateway refund reference (e.g. Stripe Refund id), set only in Stripe mode
   createdAt         DateTime @default(now())
 
   payment     Payment @relation(fields: [paymentId], references: [id])

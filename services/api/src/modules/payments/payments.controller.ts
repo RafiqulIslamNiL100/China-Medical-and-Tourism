@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Headers, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Post, Query, RawBodyRequest, Req } from "@nestjs/common";
+import type { Request } from "express";
 import { Roles } from "../../common/decorators/roles.decorator";
+import { Public } from "../../common/decorators/public.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { UserRole } from "@prisma/client";
 import { PaymentsService } from "./payments.service";
@@ -69,5 +71,17 @@ export class PaymentsController {
   @Roles(UserRole.admin)
   transactions(@CurrentUser() user: AuthenticatedUser, @Query() query: ListPaymentsQuery) {
     return this.paymentsService.transactions(user, query);
+  }
+
+  // Called by Stripe itself, not a logged-in user — authenticated via the
+  // "stripe-signature" header instead of a JWT, hence @Public(). Requires
+  // STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET to be configured; returns 400
+  // (via the global exception filter) if the signature doesn't verify.
+  @Public()
+  @Post("payments/webhook/stripe")
+  handleStripeWebhook(@Req() req: RawBodyRequest<Request>, @Headers("stripe-signature") signature: string | undefined) {
+    if (!signature) throw AppException.validation("Missing stripe-signature header.");
+    if (!req.rawBody) throw AppException.validation("Missing raw request body.");
+    return this.paymentsService.handleStripeWebhook(req.rawBody, signature);
   }
 }

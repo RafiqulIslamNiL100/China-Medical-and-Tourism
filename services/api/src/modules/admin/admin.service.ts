@@ -216,6 +216,10 @@ export class AdminService {
     return { data, meta: { nextCursor: hasMore ? data[data.length - 1].id : null, hasMore } };
   }
 
+  async listAllArticles() {
+    return this.prisma.article.findMany({ orderBy: { updatedAt: "desc" } });
+  }
+
   async getSettings() {
     const rows = await this.prisma.platformSetting.findMany();
     return Object.fromEntries(rows.map((row) => [row.key, row.value]));

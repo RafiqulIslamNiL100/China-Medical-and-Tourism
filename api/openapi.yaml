@@ -289,6 +289,14 @@ components:
         caseManagerUserId: { type: string, format: uuid, nullable: true }
         submittedAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        patientName:
+          type: string
+          nullable: true
+          description: "Present on GET /applications/{id} — the patient's or dependent's full name."
+        patientCountry:
+          type: string
+          nullable: true
+          description: "Present on GET /applications/{id}."
 
     CreateApplicationRequest:
       type: object
@@ -433,8 +441,12 @@ components:
         id: { type: string, format: uuid }
         invoiceId: { type: string, format: uuid }
         amountUsd: { type: number }
-        provider: { type: string, example: stripe }
-        providerRef: { type: string }
+        provider: { type: string, example: stripe, description: "\"stripe\" once STRIPE_SECRET_KEY is configured, \"mock\" otherwise" }
+        providerRef: { type: string, description: "The Idempotency-Key this payment was created with — used for our own dedup lookups, not the gateway's transaction id." }
+        gatewayRef:
+          type: string
+          nullable: true
+          description: "Real gateway transaction reference (e.g. Stripe PaymentIntent id). Only set in Stripe mode."
         paidAt: { type: string, format: date-time }
 
     CreatePaymentRequest:
@@ -442,7 +454,9 @@ components:
       required: [invoiceId, paymentMethodToken]
       properties:
         invoiceId: { type: string, format: uuid }
-        paymentMethodToken: { type: string, description: "Tokenized payment method from the client-side payment provider SDK — never a raw card number, per NFR-SEC-03" }
+        paymentMethodToken:
+          type: string
+          description: "Tokenized payment method from the client-side payment provider SDK — never a raw card number, per NFR-SEC-03. In Stripe mode this must be a real Stripe PaymentMethod id (e.g. a Stripe test card like \"pm_card_visa\")."
 
     Refund:
       type: object
@@ -451,6 +465,10 @@ components:
         paymentId: { type: string, format: uuid }
         amountUsd: { type: number }
         reason: { type: string }
+        gatewayRef:
+          type: string
+          nullable: true
+          description: "Real gateway refund reference (e.g. Stripe Refund id). Only set in Stripe mode."
         createdAt: { type: string, format: date-time }
 
     CommissionRate:
@@ -841,6 +859,18 @@ paths:
                     items: { $ref: "#/components/schemas/Hospital" }
                   meta: { $ref: "#/components/schemas/PaginatedMeta" }
 
+  /hospitals/mine:
+    get:
+      operationId: getHospitalsMine
+      tags: [Hospitals]
+      summary: The authenticated hospital staff member's own hospital (hospital_staff only)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Hospital" }
+
   /hospitals/{hospitalId}:
     parameters:
       - name: hospitalId
@@ -1026,6 +1056,24 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Application" }
         "422": { $ref: "#/components/responses/ValidationError" }
+
+  /applications/case-managers:
+    get:
+      operationId: getApplicationsCaseManagers
+      tags: [Applications]
+      summary: Directory of active case managers, for the ops console's reassign picker (case_manager/admin only)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    userId: { type: string, format: uuid }
+                    email: { type: string, format: email }
 
   /applications/{applicationId}:
     parameters:
@@ -1282,6 +1330,34 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Hotel" }
 
+  /hotels/mine:
+    get:
+      operationId: getHotelsMine
+      tags: [Hotels]
+      summary: The authenticated partner's own hotels with room types (hotel_partner only)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Hotel" }
+
+  /hotel-bookings/me:
+    get:
+      operationId: getHotelBookingsMe
+      tags: [Hotels]
+      summary: The authenticated patient's own case-linked hotel bookings (Screen 15)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/HotelBooking" }
+
   /hotels/{hotelId}/room-types:
     parameters:
       - name: hotelId
@@ -1441,6 +1517,61 @@ paths:
       responses:
         "200": { description: Completed; unlocks driver payment eligibility per BR-24. }
 
+  /drivers:
+    get:
+      operationId: getDrivers
+      tags: [Transport]
+      summary: Driver directory for assignment (case_manager/admin only, Screen 46)
+      responses:
+        "200": { description: OK. }
+
+  /interpreters:
+    get:
+      operationId: getInterpreters
+      tags: [Transport]
+      summary: Interpreter directory for assignment (case_manager/admin only, Screen 46)
+      responses:
+        "200": { description: OK. }
+
+  /assignment-board:
+    get:
+      operationId: getAssignmentBoard
+      tags: [Transport]
+      summary: Cross-case transfers and interpreter sessions awaiting or holding an assignment (case_manager/admin only, Screen 46)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transfers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        applicationId: { type: string, format: uuid }
+                        refNumber: { type: string }
+                        direction: { type: string, enum: [Arrival, Departure] }
+                        scheduledAt: { type: string, format: date-time }
+                        pickupLocation: { type: string }
+                        status: { type: string, enum: [Requested, Assigned, Completed, Cancelled] }
+                        assignedTo: { type: string, nullable: true }
+                  interpreterSessions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        applicationId: { type: string, format: uuid }
+                        refNumber: { type: string }
+                        hospitalVisitAt: { type: string, format: date-time }
+                        department: { type: string, nullable: true }
+                        status: { type: string, enum: [Requested, Assigned, Completed, Cancelled] }
+                        assignedTo: { type: string, nullable: true }
+
   /drivers/me/trips:
     get:
       operationId: getDriversMeTrips
@@ -1457,7 +1588,15 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: "#/components/schemas/TransferRequest" }
+                items:
+                  allOf:
+                    - { $ref: "#/components/schemas/TransferRequest" }
+                    - type: object
+                      description: "Denormalized case context not present on the base TransferRequest, since drivers can't call GET /applications/{id} directly."
+                      properties:
+                        refNumber: { type: string }
+                        patientName: { type: string, nullable: true }
+                        patientPhone: { type: string, nullable: true }
 
   /applications/{applicationId}/interpreter-sessions:
     parameters:
@@ -1539,7 +1678,15 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: "#/components/schemas/InterpreterAssignment" }
+                items:
+                  allOf:
+                    - { $ref: "#/components/schemas/InterpreterAssignment" }
+                    - type: object
+                      description: "Denormalized case context not present on the base InterpreterAssignment, since interpreters can't call GET /applications/{id} directly."
+                      properties:
+                        refNumber: { type: string }
+                        patientName: { type: string, nullable: true }
+                        hospitalName: { type: string, nullable: true }
 
   # -------------------------------------------------------------------------
   # Payments — FR-PAY-01 through FR-PAY-06
@@ -1697,6 +1844,31 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Payment" }
                   meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /payments/webhook/stripe:
+    post:
+      operationId: postPaymentsWebhookStripe
+      tags: [Payments]
+      summary: Stripe webhook receiver — called by Stripe, not by the frontend
+      description: >
+        Authenticated via the `stripe-signature` header (verified against
+        STRIPE_WEBHOOK_SECRET) instead of a bearer JWT, since Stripe itself is the
+        caller. The current integration confirms card payments synchronously in
+        POST /invoices/{invoiceId}/pay, so this endpoint isn't on the critical path for
+        the simple card flow — it verifies and logs events, and is the correct
+        extension point for a production integration that also needs to react to
+        asynchronous events (3D Secure follow-up, disputes).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: A raw Stripe Event object — signature-verified, not schema-validated.
+      responses:
+        "200": { description: "Signature verified and event logged." }
+        "400": { description: "Missing or invalid stripe-signature header." }
 
   # -------------------------------------------------------------------------
   # Reviews — FR-REVIEW-01 through FR-REVIEW-03
@@ -2067,6 +2239,20 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/AuditLogEntry" }
                   meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /admin/articles:
+    get:
+      operationId: getAdminArticles
+      tags: [Admin]
+      summary: List all CMS articles including drafts (admin only), for the CMS console (Screen 52)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Article" }
 
   /admin/settings:
     get:

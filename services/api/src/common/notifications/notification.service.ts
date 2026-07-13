@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
+import { SmsService } from "../sms/sms.service";
 import { NotificationChannel } from "@prisma/client";
 
 export interface NotifyInput {
@@ -25,6 +26,7 @@ export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
+    private readonly sms: SmsService,
   ) {}
 
   async notify(input: NotifyInput): Promise<void> {
@@ -48,6 +50,13 @@ export class NotificationService {
     if (preference?.emailEnabled ?? true) {
       await this.dispatchEmail(input);
     }
+
+    // smsEnabled defaults to false when no preference row exists (opt-in, unlike
+    // email/in-app) — SMS costs real money per message even in dev/test mode, so it
+    // shouldn't fire for every user by default the moment Twilio is configured.
+    if (preference?.smsEnabled) {
+      await this.dispatchSms(input);
+    }
   }
 
   private async dispatchEmail(input: NotifyInput): Promise<void> {
@@ -58,5 +67,12 @@ export class NotificationService {
     }
 
     await this.email.send({ to: user.email, subject: input.title, text: input.body });
+  }
+
+  private async dispatchSms(input: NotifyInput): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: input.userId }, select: { phone: true } });
+    if (!user?.phone) return;
+
+    await this.sms.send({ to: user.phone, body: `${input.title}: ${input.body}` });
   }
 }

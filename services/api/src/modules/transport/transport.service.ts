@@ -92,10 +92,13 @@ export class TransportService {
     const driver = await this.prisma.driver.findUnique({ where: { userId: user.userId } });
     if (!driver) throw AppException.forbidden();
 
-    return this.prisma.transferRequest.findMany({
+    const transfers = await this.prisma.transferRequest.findMany({
       where: { driverId: driver.id, deletedAt: null, ...(status ? { status } : {}) },
       orderBy: { scheduledAt: "asc" },
+      include: { application: { select: { refNumber: true, patientId: true, dependentId: true } } },
     });
+
+    return Promise.all(transfers.map((t) => this.withPatientInfo(t)));
   }
 
   // --- interpreter sessions (FR-INTERP-01..03) --------------------------------------
@@ -162,13 +165,105 @@ export class TransportService {
     const interpreter = await this.prisma.interpreter.findUnique({ where: { userId: user.userId } });
     if (!interpreter) throw AppException.forbidden();
 
-    return this.prisma.interpreterAssignment.findMany({
+    const sessions = await this.prisma.interpreterAssignment.findMany({
       where: { interpreterId: interpreter.id, deletedAt: null },
       orderBy: { hospitalVisitAt: "asc" },
+      include: {
+        application: { select: { refNumber: true, patientId: true, dependentId: true, hospitalId: true } },
+      },
     });
+
+    return Promise.all(
+      sessions.map(async (s) => {
+        const { application, ...rest } = s;
+        const [patient, dependent, hospital] = await Promise.all([
+          this.prisma.patient.findUnique({ where: { id: application.patientId }, select: { fullName: true } }),
+          application.dependentId
+            ? this.prisma.dependent.findUnique({ where: { id: application.dependentId }, select: { fullName: true } })
+            : Promise.resolve(null),
+          this.prisma.hospital.findUnique({ where: { id: application.hospitalId }, select: { name: true } }),
+        ]);
+        return {
+          ...rest,
+          refNumber: application.refNumber,
+          patientName: dependent?.fullName ?? patient?.fullName ?? null,
+          hospitalName: hospital?.name ?? null,
+        };
+      }),
+    );
+  }
+
+  async listDrivers(user: AuthenticatedUser) {
+    this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
+    return this.prisma.driver.findMany({ orderBy: { fullName: "asc" } });
+  }
+
+  async listInterpreters(user: AuthenticatedUser) {
+    this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
+    return this.prisma.interpreter.findMany({ orderBy: { fullName: "asc" } });
+  }
+
+  // --- assignment board (ops console) -----------------------------------------------
+
+  async listAssignmentBoard(user: AuthenticatedUser) {
+    this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
+    const openStatuses = [ServiceAssignmentStatus.Requested, ServiceAssignmentStatus.Assigned];
+
+    const [transfers, sessions] = await Promise.all([
+      this.prisma.transferRequest.findMany({
+        where: { deletedAt: null, status: { in: openStatuses } },
+        orderBy: { scheduledAt: "asc" },
+        include: { application: { select: { refNumber: true } }, driver: { select: { fullName: true } } },
+      }),
+      this.prisma.interpreterAssignment.findMany({
+        where: { deletedAt: null, status: { in: openStatuses } },
+        orderBy: { hospitalVisitAt: "asc" },
+        include: { application: { select: { refNumber: true } }, interpreter: { select: { fullName: true } } },
+      }),
+    ]);
+
+    return {
+      transfers: transfers.map((t) => ({
+        id: t.id,
+        applicationId: t.applicationId,
+        refNumber: t.application.refNumber,
+        direction: t.direction,
+        scheduledAt: t.scheduledAt,
+        pickupLocation: t.pickupLocation,
+        status: t.status,
+        assignedTo: t.driver?.fullName ?? null,
+      })),
+      interpreterSessions: sessions.map((s) => ({
+        id: s.id,
+        applicationId: s.applicationId,
+        refNumber: s.application.refNumber,
+        hospitalVisitAt: s.hospitalVisitAt,
+        department: s.department,
+        status: s.status,
+        assignedTo: s.interpreter?.fullName ?? null,
+      })),
+    };
   }
 
   // --- internal helpers -----------------------------------------------------------
+
+  private async withPatientInfo<
+    T extends { application: { refNumber: string; patientId: string; dependentId: string | null } },
+  >(record: T) {
+    const { application, ...rest } = record;
+    const [patient, dependent] = await Promise.all([
+      this.prisma.patient.findUnique({ where: { id: application.patientId }, select: { fullName: true, phone: true } }),
+      application.dependentId
+        ? this.prisma.dependent.findUnique({ where: { id: application.dependentId }, select: { fullName: true } })
+        : Promise.resolve(null),
+    ]);
+    return {
+      ...rest,
+      refNumber: application.refNumber,
+      patientName: dependent?.fullName ?? patient?.fullName ?? null,
+      patientPhone: patient?.phone ?? null,
+    };
+  }
 
   private async notifyPatient(applicationId: string, title: string, body: string) {
     const application = await this.prisma.application.findUnique({ where: { id: applicationId } });

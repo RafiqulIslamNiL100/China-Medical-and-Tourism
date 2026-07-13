@@ -42,6 +42,16 @@ export class HospitalsService {
     return { data, meta: { nextCursor: hasMore ? data[data.length - 1].id : null, hasMore } };
   }
 
+  /** The hospital this staff member belongs to — Screen 20's "my hospital" context. */
+  async getMine(staffUserId: string) {
+    const staff = await this.prisma.hospitalStaff.findUnique({
+      where: { userId: staffUserId },
+      include: { hospital: true },
+    });
+    if (!staff) throw AppException.forbidden();
+    return { ...staff.hospital, staffTitle: staff.title };
+  }
+
   async getById(hospitalId: string) {
     const hospital = await this.prisma.hospital.findUnique({ where: { id: hospitalId } });
     if (!hospital || hospital.status !== HospitalListingStatus.Published) {

@@ -1,11 +1,31 @@
-import type { Metadata } from "next";
-import { Stars } from "@/components/Stars";
-import { platformKpis, conversionFunnel, hospitalLeaderboard } from "@/data/admin";
+"use client";
 
-export const metadata: Metadata = { title: "Admin Dashboard" };
+import { useEffect, useState } from "react";
+import { Stars } from "@/components/Stars";
+import { useAuth } from "@/lib/auth-client";
+import { statusLabel } from "@/lib/portal";
+import { getAdminDashboard, searchHospitals, type PlatformAnalytics, type Hospital } from "@/lib/api";
 
 export default function AdminDashboardPage() {
-  const maxCount = conversionFunnel[0].count;
+  const { accessToken } = useAuth();
+  const [analytics, setAnalytics] = useState<PlatformAnalytics | null>(null);
+  const [topHospitals, setTopHospitals] = useState<Hospital[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    Promise.all([getAdminDashboard(accessToken), searchHospitals()])
+      .then(([dashboard, hospitals]) => {
+        setAnalytics(dashboard);
+        setTopHospitals([...hospitals.data].sort((a, b) => Number(b.rating) - Number(a.rating)).slice(0, 6));
+      })
+      .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  if (loading) return <p className="text-sm text-neutral-500">Loading…</p>;
+  if (!analytics) return <p className="text-sm text-neutral-500">No data available.</p>;
+
+  const maxCount = analytics.conversionFunnel[0]?.count ?? 1;
 
   return (
     <div className="flex flex-col gap-6">
@@ -14,26 +34,22 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-4">
         <div className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">Bookings</p>
-          <p className="mt-1 text-2xl font-bold text-neutral-900 tabular-nums">
-            {platformKpis.bookingsThisMonth}
-          </p>
+          <p className="mt-1 text-2xl font-bold text-neutral-900 tabular-nums">{analytics.bookingsThisMonth}</p>
         </div>
         <div className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">Revenue</p>
           <p className="mt-1 text-2xl font-bold text-neutral-900 tabular-nums">
-            ${platformKpis.revenueThisMonthUsd.toLocaleString()}
+            ${analytics.revenueThisMonthUsd.toLocaleString()}
           </p>
         </div>
         <div className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">Active Cases</p>
-          <p className="mt-1 text-2xl font-bold text-neutral-900 tabular-nums">
-            {platformKpis.activeCases}
-          </p>
+          <p className="mt-1 text-2xl font-bold text-neutral-900 tabular-nums">{analytics.activeCases}</p>
         </div>
         <div className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">SLA Compliance</p>
           <p className="mt-1 text-2xl font-bold text-success-600 tabular-nums">
-            {Math.round(platformKpis.slaComplianceRate * 100)}%
+            {Math.round(analytics.slaComplianceRate * 100)}%
           </p>
         </div>
       </div>
@@ -42,16 +58,16 @@ export default function AdminDashboardPage() {
         <section className="rounded-[10px] border border-neutral-300 bg-white p-6 shadow-sm">
           <h2 className="mb-4 font-bold text-neutral-900">Conversion funnel</h2>
           <div className="flex flex-col gap-3">
-            {conversionFunnel.map((stage) => (
+            {analytics.conversionFunnel.map((stage) => (
               <div key={stage.stage}>
                 <div className="mb-1 flex justify-between text-sm">
-                  <span className="text-neutral-700">{stage.stage}</span>
+                  <span className="text-neutral-700">{statusLabel(stage.stage)}</span>
                   <span className="font-semibold text-neutral-900 tabular-nums">{stage.count}</span>
                 </div>
                 <div className="h-2 rounded-full bg-neutral-100">
                   <div
                     className="h-2 rounded-full bg-primary-600"
-                    style={{ width: `${(stage.count / maxCount) * 100}%` }}
+                    style={{ width: `${maxCount ? (stage.count / maxCount) * 100 : 0}%` }}
                   />
                 </div>
               </div>
@@ -60,20 +76,18 @@ export default function AdminDashboardPage() {
         </section>
 
         <section className="rounded-[10px] border border-neutral-300 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 font-bold text-neutral-900">Hospital performance</h2>
+          <h2 className="mb-4 font-bold text-neutral-900">Top rated hospitals</h2>
           <div className="flex flex-col gap-3">
-            {hospitalLeaderboard.map((h) => (
-              <div key={h.name} className="flex items-center justify-between border-b border-neutral-100 pb-3 last:border-0">
+            {topHospitals.map((h) => (
+              <div key={h.id} className="flex items-center justify-between border-b border-neutral-100 pb-3 last:border-0">
                 <div>
                   <p className="text-sm font-semibold text-neutral-900">{h.name}</p>
-                  <Stars rating={h.rating} />
+                  <Stars rating={Number(h.rating)} />
                 </div>
-                <div className="text-right text-sm">
-                  <p className="font-semibold text-neutral-900 tabular-nums">{h.bookings} bookings</p>
-                  <p className="text-neutral-500 tabular-nums">${h.revenueUsd.toLocaleString()}</p>
-                </div>
+                <p className="text-sm text-neutral-500 tabular-nums">{h.reviewCount} reviews</p>
               </div>
             ))}
+            {topHospitals.length === 0 ? <p className="text-sm text-neutral-500">No hospitals yet.</p> : null}
           </div>
         </section>
       </div>

@@ -16,6 +16,18 @@ export class HotelsController {
     return this.hotelsService.search(query);
   }
 
+  @Get("hotels/mine")
+  @Roles(UserRole.hotel_partner)
+  getMyHotels(@CurrentUser() user: AuthenticatedUser) {
+    return this.hotelsService.getMyHotels(user.userId);
+  }
+
+  @Get("hotel-bookings/me")
+  @Roles(UserRole.patient)
+  listMyBookings(@CurrentUser() user: AuthenticatedUser) {
+    return this.hotelsService.listMyBookings(user.userId);
+  }
+
   @Public()
   @Get("hotels/:hotelId/room-types")
   listRoomTypes(@Param("hotelId") hotelId: string) {

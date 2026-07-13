@@ -1,14 +1,37 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/Badge";
 import { SlaChip } from "@/components/portal/SlaChip";
-import { incomingApplications, hospitalReportSummary } from "@/data/hospitalStaff";
-
-export const metadata: Metadata = { title: "Hospital Dashboard" };
+import { useAuth } from "@/lib/auth-client";
+import { statusLabel, fmtDate, slaRiskFor } from "@/lib/portal";
+import { getMyHospital, getHospitalReports, listApplications, type Application } from "@/lib/api";
 
 export default function HospitalDashboardPage() {
-  const needsResponse = incomingApplications.filter(
-    (a) => a.status === "Submitted" || a.status === "Under Review" || a.status === "Info Requested"
+  const { accessToken } = useAuth();
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [summary, setSummary] = useState<{ bookingsThisMonth: number; revenueThisMonthUsd: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    getMyHospital(accessToken)
+      .then(async (hospital) => {
+        const [apps, reports] = await Promise.all([
+          listApplications(accessToken),
+          getHospitalReports(accessToken, hospital.id),
+        ]);
+        setApplications(apps.data);
+        setSummary(reports);
+      })
+      .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  if (loading) return <p className="text-sm text-neutral-500">Loading…</p>;
+
+  const needsResponse = applications.filter(
+    (a) => a.status === "Submitted" || a.status === "UnderReview" || a.status === "InfoRequested",
   );
 
   return (
@@ -17,22 +40,13 @@ export default function HospitalDashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-            Bookings this month
-          </p>
-          <p className="mt-1 text-2xl font-bold text-neutral-900">
-            {hospitalReportSummary.bookingsThisMonth}
-          </p>
-          <p className="text-xs text-success-600">
-            +{hospitalReportSummary.bookingsThisMonth - hospitalReportSummary.bookingsLastMonth} vs last month
-          </p>
+          <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">Bookings this month</p>
+          <p className="mt-1 text-2xl font-bold text-neutral-900">{summary?.bookingsThisMonth ?? 0}</p>
         </div>
         <div className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-            Revenue this month
-          </p>
+          <p className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">Revenue this month</p>
           <p className="mt-1 text-2xl font-bold text-neutral-900">
-            ${hospitalReportSummary.revenueThisMonthUsd.toLocaleString()}
+            ${(summary?.revenueThisMonthUsd ?? 0).toLocaleString()}
           </p>
         </div>
         <div className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm">
@@ -58,17 +72,22 @@ export default function HospitalDashboardPage() {
               className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-neutral-300 bg-white p-4 shadow-sm hover:shadow-md"
             >
               <div>
-                <p className="font-bold text-neutral-900">{a.patientName}</p>
+                <p className="font-bold text-neutral-900">{a.refNumber}</p>
                 <p className="text-sm text-neutral-500">
-                  {a.specialty} &middot; {a.refNumber} &middot; Submitted {a.submittedDate}
+                  {a.specialtySlug} &middot; Submitted {fmtDate(a.submittedAt)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge>{a.status}</Badge>
-                <SlaChip risk={a.slaRisk} />
+                <Badge>{statusLabel(a.status)}</Badge>
+                <SlaChip risk={slaRiskFor(a.submittedAt, a.status)} />
               </div>
             </Link>
           ))}
+          {needsResponse.length === 0 ? (
+            <p className="rounded-[10px] border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500">
+              Nothing needs your response right now.
+            </p>
+          ) : null}
         </div>
       </section>
     </div>

@@ -115,7 +115,31 @@ export class ApplicationsService {
 
   async getById(user: AuthenticatedUser, applicationId: string) {
     const application = await this.findScoped(user, applicationId);
-    return application;
+    // Screen 12/45: the case timeline. History is append-only and visible to every
+    // role that can see the case at all.
+    const statusHistory = await this.prisma.caseStatusHistory.findMany({
+      where: { applicationId: application.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, status: true, note: true, createdAt: true },
+    });
+    const [patient, dependent] = await Promise.all([
+      this.prisma.patient.findUnique({
+        where: { id: application.patientId },
+        select: { fullName: true, country: true },
+      }),
+      application.dependentId
+        ? this.prisma.dependent.findUnique({
+            where: { id: application.dependentId },
+            select: { fullName: true, relationship: true },
+          })
+        : Promise.resolve(null),
+    ]);
+    return {
+      ...application,
+      statusHistory,
+      patientName: dependent ? dependent.fullName : (patient?.fullName ?? null),
+      patientCountry: patient?.country ?? null,
+    };
   }
 
   async decide(user: AuthenticatedUser, applicationId: string, dto: ApplicationDecisionDto) {
@@ -206,6 +230,16 @@ export class ApplicationsService {
     }
 
     return updated;
+  }
+
+  async listCaseManagers(user: AuthenticatedUser) {
+    this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
+    const users = await this.prisma.user.findMany({
+      where: { role: UserRole.case_manager, status: "Active" },
+      select: { id: true, email: true },
+      orderBy: { email: "asc" },
+    });
+    return users.map((u) => ({ userId: u.id, email: u.email }));
   }
 
   async reassign(user: AuthenticatedUser, applicationId: string, dto: ReassignDto) {

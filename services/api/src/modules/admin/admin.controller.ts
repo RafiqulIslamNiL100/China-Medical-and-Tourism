@@ -56,6 +56,11 @@ export class AdminController {
     return this.adminService.auditLog(query);
   }
 
+  @Get("articles")
+  listAllArticles() {
+    return this.adminService.listAllArticles();
+  }
+
   @Get("settings")
   getSettings() {
     return this.adminService.getSettings();
