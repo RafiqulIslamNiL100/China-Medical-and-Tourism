@@ -208,12 +208,12 @@ product each time.
 | Phase 1 — Product Planning | ✅ Complete |
 | Phase 2 — UI/UX Design | ✅ Complete (54 screens specified + visual token reference) |
 | Phase 3 — System Architecture | ✅ Complete (9 docs: overview/diagrams, frontend, backend/API, database, auth/security, storage/caching/search, notifications, observability, deployment/CI-CD) |
-| Phase 4 — Folder Structure | Partial — `apps/web` scaffolded (see §14) and `database/` added (§15); backend services/packages layout not yet defined |
-| Phase 5 — Module-by-module build | Frontend complete — all 59 screens from Phase 2 are built and navigable in `apps/web` on mock data across all 6 portals; no real backend/auth/database wired up yet (see §14) |
-| Phase 6 — Database Design | ✅ Complete — 40-model Prisma schema (`database/prisma/schema.prisma`, validated), ERD, and field-by-field schema reference with FR-\*/BR-\* traceability (see §15) |
-| Phase 7 — API Specification | ✅ Complete — 84-operation OpenAPI 3.0 spec (`api/openapi.yaml`, lint-validated), overview, and endpoint reference (see §16) |
-| Phase 8 — Testing | Not started (no automated tests yet — build/lint pass) |
-| Phase 9 — Deployment | Not started |
+| Phase 4 — Folder Structure | ✅ Complete — `apps/web` (frontend, §14), `database/` (Prisma schema + migrations + seed, §15), and `services/api` (NestJS backend, §17) all scaffolded as npm workspaces |
+| Phase 5 — Module-by-module build | Frontend: all 59 screens from Phase 2 are built and navigable in `apps/web` across all 6 portals. Backend: all 12 modules from the OpenAPI spec are implemented with real persistence in `services/api` (see §17). Frontend↔backend wiring: auth, hospital directory, and the patient application flow are wired to the real API as a demonstrated vertical slice; the remaining screens still run on the mock data described in §14 (see §17 for the exact list) |
+| Phase 6 — Database Design | ✅ Complete and **applied** — 40+ model Prisma schema (`database/prisma/schema.prisma`), 4 migrations run against a real local Postgres 16 instance, seed script loads realistic demo data (see §15) |
+| Phase 7 — API Specification | ✅ Complete and **implemented** — 84-operation OpenAPI 3.0 spec (`api/openapi.yaml`, lint-validated); every operation is now backed by real NestJS controller/service code (see §17) |
+| Phase 8 — Testing | No automated test suite yet. Every module was smoke-tested end-to-end via curl/Playwright against the real running API + database during implementation (see §17), but there is no repeatable `npm test` — this is the next real gap |
+| Phase 9 — Deployment | Not started for the backend (`services/api` has no Dockerfile/CI/hosting config yet). The frontend has been manually deployed to Vercel by the user outside this workflow |
 
 ## 14. Current Implementation — `apps/web`
 
@@ -265,33 +265,49 @@ route groups so each surface gets the right chrome:
   the design spec's emphasis on one-handed, on-the-go use for those roles.
 
 All six surfaces use the exact color/type tokens from
-`docs/02-ui-ux-design/01-style-guide.md` and typed mock-data layers
-(`apps/web/src/data/hospitals.ts`, `apps/web/src/data/patient.ts`,
+`docs/02-ui-ux-design/01-style-guide.md`. Most screens still read from the typed
+mock-data layers (`apps/web/src/data/hospitals.ts`, `apps/web/src/data/patient.ts`,
 `apps/web/src/data/hospitalStaff.ts`, `apps/web/src/data/opsConsole.ts`,
-`apps/web/src/data/admin.ts`, `apps/web/src/data/partner.ts`) standing in for the
-backend.
+`apps/web/src/data/admin.ts`, `apps/web/src/data/partner.ts`); a specific subset (below)
+now reads from the real backend instead.
 
 **What this is:** a real, buildable, navigable product demonstrating the design system
 and full information architecture end to end — the public site, a patient's day-to-day
 experience, a hospital staff member's application-review workflow, internal
 case-manager operations, platform administration, and every partner role's task
-surface. Every one of the 59 screens specified in Phase 2 exists and renders correctly;
-this is the complete frontend shell, ready to be wired up to a real backend.
+surface. Every one of the 59 screens specified in Phase 2 exists and renders correctly.
 
-**What this is not yet — and this is the real remaining work:** connected to any real
-backend. A validated database schema now exists (§15) but isn't applied to a running
-database or consumed by any code — there is still no real authentication, no payment
-processing, and no persistence anywhere in `apps/web`. Login/register are static UI
-only, every "portal" is a fixed demo identity (not a real session), and every mutating
-control across every screen — the Application Wizard, hospital
-Accept/Request-Info/Decline, ops assignment dropdowns, admin moderation actions, hotel
-booking confirm/reject, driver/interpreter "Mark Complete" — is non-functional UI that
-doesn't change any state. Turning this frontend into a working product requires Phase 4
-(full folder structure for the backend services), Phase 7 (API specification), and then
-actually implementing each module's backend per `docs/03-architecture/` and this
-schema, and wiring these existing screens to it.
+**Wired to the real backend (`services/api`, §17), as of this update:**
+- `src/lib/api.ts` — a typed fetch client for the real API, and `src/lib/auth-client.tsx`
+  — a client-side `AuthProvider`/`useAuth()` React context that stores the JWT access/
+  refresh token pair in `localStorage` (a pragmatic simplification for this vertical
+  slice — a production build would use httpOnly cookies) and exposes `login`,
+  `register`, `verifyEmail`, `logout`.
+- `/login` and `/register` (with an inline OTP-verification step) call the real
+  `/auth/*` endpoints and store real tokens on success.
+- `/hospitals` and `/hospitals/[slug]` are server components that fetch the real,
+  seeded hospital/doctor/package/review data from `GET /hospitals`,
+  `GET /hospitals/{id}/{doctors,packages,reviews}` — no more static hospital list.
+- The Patient Portal's `/app/apply` wizard (`ApplicationWizard.tsx`) fetches real,
+  specialty-filtered hospitals for its dropdown and submits via a real
+  `POST /applications` call using the logged-in patient's access token.
+- `/app/cases` (My Applications) is a client component that calls the real
+  `GET /applications` and renders the logged-in patient's actual cases, correctly
+  split across the Active/Completed/Declined tabs.
+- All of the above was verified with a real Playwright browser session against the
+  seeded `amara.nwosu@example.com` account (see §17) — not just a build check.
 
-Run locally: `cd apps/web && npm install && npm run dev`.
+**Still on mock data — deliberately out of scope for this pass:** every other screen
+across all six portals (hospital staff, ops console, admin console, all three partner
+portals, and the rest of the patient portal — dependents, documents, messages,
+itinerary, payments, notifications, reviews). This was an explicit scoping decision
+("a demonstrated vertical slice," not "wire all 59 screens") — the backend already
+implements every one of these screens' endpoints (§17), so wiring the remaining screens
+is now a mechanical repeat of the same pattern (`src/lib/api.ts` call + real
+`accessToken` from `useAuth()`), not new backend work.
+
+Run locally: `cd apps/web && npm install && npm run dev` (also start `services/api`,
+see §17, and set `NEXT_PUBLIC_API_BASE_URL` per `apps/web/.env.example`).
 
 ## 15. Database — `database/`
 
@@ -306,12 +322,22 @@ Booking, Visa, Hotel, Transport, Payment, CMS, Reviews, Notification, Admin).
   `docs/06-database-design/02-schema-reference.md`
 - Setup/usage: `database/README.md`
 
-**Validated, not yet applied:** `npx prisma validate` passes against this schema
-(Prisma 6 — see the note in §9 about Prisma 7's breaking config change), but no
-migration has been run against a real Postgres instance, no Prisma Client has been
-generated into `apps/web`, and nothing in the frontend queries it. That wiring — plus
-the backend services themselves — is the module-by-module backend implementation that
-comes after Phase 7 (§16).
+**Validated and applied.** `npx prisma validate` passes (Prisma 6 — see the note in §9
+about Prisma 7's breaking config change), and the schema has been migrated onto a real
+local Postgres 16 instance via 4 migrations in `database/prisma/migrations/`
+(the Phase 6 baseline plus 3 evolutions made during backend implementation: OTP/
+password-reset storage, `Refund.idempotencyKey`). `@prisma/client` is generated into
+the shared workspace `node_modules` and consumed directly by `services/api` (§17).
+
+**Demo data:** `database/prisma/seed.js` (`npm run seed` from `database/`, or
+`node prisma/seed.js`) seeds realistic data that mirrors the frontend's mock content —
+the same 3 hospitals, doctors, and treatment packages as
+`apps/web/src/data/hospitals.ts`, the same patient (Amara Nwosu, with 3 cases in
+different statuses matching `apps/web/src/data/patient.ts`) plus 3 more patients, a
+hotel, a driver, an interpreter, published articles, commission rates, and platform
+settings — so the two layers describe the same demo world even before every screen is
+wired up. All demo accounts share the password `Passw0rd!23`; the script is idempotent
+(skips if a `Hospital` row already exists) and prints the full account list on success.
 
 ## 16. API Specification — `api/`
 
@@ -330,9 +356,80 @@ non-fixes (see `docs/07-api-specification/01-api-overview.md` §4), not oversigh
 - Preview interactively: `npx @redocly/cli preview-docs api/openapi.yaml` from the
   repo root.
 
-**Specified, not implemented.** No backend code exists that serves any of these
-routes — `apps/web`'s 59 screens still run entirely on the mock data described in §14.
-Implementing this spec (NestJS controllers/services per
-`docs/03-architecture/03-backend-api-architecture.md`, backed by the Phase 6 schema)
-and wiring the frontend to it is the next real milestone, and the largest remaining
-piece of work on the roadmap.
+**Specified and implemented.** Every operation in this spec is now served by real
+NestJS code in `services/api` — see §17 for what "real" means module by module, and
+which pieces are deliberately adapter/stand-in implementations pending real
+credentials (payment processor, S3, email/SMS provider).
+
+## 17. Backend Implementation — `services/api`
+
+A NestJS 10 service implementing the full `api/openapi.yaml` spec against the Phase 6
+Prisma schema, running on a real local Postgres 16 instance (no Docker — this sandbox
+has no daemon, but Postgres ships as a system package and works directly). All 12
+OpenAPI modules are implemented as NestJS modules with real database-backed services,
+not stubs: Auth, Patients, Hospitals, Applications, Documents, Hotels, Transport,
+Payments, Reviews, Notifications, CMS, Admin.
+
+**Real, not mocked:**
+- **Auth** — argon2 password hashing, email-OTP verification (`otplib` for the actual
+  2FA TOTP path), JWT access tokens (15 min) + rotating refresh tokens (30 days,
+  SHA-256-hashed in a `Session` table) with reuse detection (a replayed refresh token
+  revokes the session), and password reset. Verified end-to-end via curl including the
+  negative case (a reused refresh token is correctly rejected).
+- **Authorization** — a global `JwtAuthGuard` (default-deny, `@Public()` opt-out) and
+  `RolesGuard` (`@Roles()`), plus role-scoped data access enforced in the *service*
+  layer, not just route guards — e.g. a patient can only see their own cases, hospital
+  staff are scoped to their own hospital via their `HospitalStaff` row, case managers/
+  admins see cross-hospital data. Verified with real negative-permission tests (e.g. a
+  patient calling an endpoint that requires `case_manager` correctly gets 403).
+- **Business rules enforced in code, not just spec text** — BR-14 (accepting a case
+  auto-creates a booking-deposit invoice), BR-17 (an invitation letter can't be
+  generated until the case is Accepted *and* the deposit is Paid — checked explicitly,
+  not assumed), BR-20 (one review per completed case, enforced via a DB unique
+  constraint plus a service-level check), BR-23 (only case_manager/admin can assign a
+  driver), idempotent payments and refunds via a required `Idempotency-Key` header
+  (real replay-safe behavior verified: the same key returns the same Payment/Refund
+  instead of double-charging or double-refunding).
+- **Cross-module workflows**, not isolated CRUD — accepting an application creates the
+  visa document checklist and the deposit invoice in the same transaction; paying an
+  invoice notifies the assigned case manager and updates the admin dashboard's revenue
+  figure live; moderating a review notifies the patient and makes it visible on the
+  public hospital page.
+- **Append-only audit log** (`AuditLog`, NFR-SEC-07/BR-30) — `AuditService` only ever
+  `INSERT`s; there is deliberately no update/delete method, matching that no
+  write/delete endpoint for it exists in the OpenAPI spec.
+
+**Real adapters standing in for infrastructure this sandbox doesn't have credentials
+for** — each is a single small class behind the interface the rest of the code calls,
+documented in-code as swappable for the real thing without touching any caller:
+- `StorageService` — saves uploaded files to local disk (`.data/documents/`) instead of
+  S3; `resolveDownloadUrl()` returns an API path instead of a signed URL.
+- `NotificationService` — always writes the real, queryable in-app `Notification` row
+  (this part is not mocked), and console-logs an "email" instead of calling
+  Resend/Twilio. Now also checks `NotificationPreference` before sending (FR-NOTIF-04),
+  defaulting to enabled when no preference row exists.
+- `MockPaymentProcessor` — the token `"tok_decline"` is a documented test hook that
+  simulates a processor decline (exercising the real `402` path); any other token
+  "succeeds." No real card data ever flows through this — the spec's
+  `paymentMethodToken` field is designed to only ever carry an opaque tokenized
+  reference from a real client-side SDK in production.
+- Payment receipts (`GET /invoices/{id}/receipt`) are served as plain text, not PDF —
+  no PDF-rendering library is available in this environment. The response is honestly
+  labeled as a development placeholder rather than mislabeled as `application/pdf`.
+
+**Known, accepted gaps:**
+- No automated test suite (`npm test`) — verification so far is thorough manual/curl/
+  Playwright smoke testing across every module (documented per-module above), not a
+  repeatable CI-gated suite.
+- `npm audit` on `services/api` shows 24 vulnerabilities, all in dev-only build tooling
+  (`@nestjs/cli`'s transitive deps — webpack, inquirer, tmp), not runtime dependencies;
+  fixing requires a `@nestjs/cli` v10→v11 major bump, deliberately deferred rather than
+  done reflexively.
+- No Dockerfile, CI pipeline, or deployment config for `services/api` yet (Phase 9).
+- Frontend wiring is a deliberately scoped vertical slice (auth + hospitals +
+  application flow), not all 59 screens — see §14 for the exact list of what's wired
+  versus still on mock data.
+
+Run locally: `cd database && npm run seed` (after `npm run migrate:dev` — see
+`database/README.md`), then `cd services/api && npm install && npm run start:dev`. The
+API listens on `http://localhost:3001/v1`.

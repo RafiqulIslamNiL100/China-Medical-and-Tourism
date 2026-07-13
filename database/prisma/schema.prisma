@@ -133,13 +133,15 @@ model User {
   passwordHash     String
   role             UserRole
   status           UserStatus @default(Active)
+  emailVerifiedAt  DateTime? // FR-AUTH-02 — null until OTP verification completes
   twoFactorEnabled Boolean    @default(false)
   twoFactorSecret  String?
   lastLoginAt      DateTime?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  sessions Session[]
+  sessions          Session[]
+  verificationCodes VerificationCode[]
 
   // Role-specific profile relations (exactly one populated, matching `role`)
   patientProfile       Patient?
@@ -175,6 +177,28 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+enum VerificationCodePurpose {
+  EmailVerification
+  PasswordReset
+}
+
+// FR-AUTH-02 (OTP verification), FR-AUTH-03 (password reset). Codes are single-use
+// (consumedAt) and time-limited (expiresAt) per the 10-minute window fixed in
+// docs/03-architecture/05-auth-security-architecture.md §1.
+model VerificationCode {
+  id          String                   @id @default(uuid())
+  userId      String
+  codeHash    String
+  purpose     VerificationCodePurpose
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime                 @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
 }
 
 // ---------------------------------------------------------------------------
@@ -652,6 +676,7 @@ model Refund {
   amountUsd         Decimal  @db.Decimal(10, 2)
   reason            String
   processedByUserId String
+  idempotencyKey    String   @unique
   createdAt         DateTime @default(now())
 
   payment     Payment @relation(fields: [paymentId], references: [id])

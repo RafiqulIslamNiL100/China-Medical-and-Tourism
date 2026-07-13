@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Container, PageHero } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
-import { hospitals, cities, specialties } from "@/data/hospitals";
+import { cities, specialties } from "@/data/hospitals";
+import { searchHospitals } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Find a Hospital",
@@ -16,15 +17,17 @@ export default async function HospitalsPage({
   searchParams: Promise<{ city?: string; specialty?: string }>;
 }) {
   const params = await searchParams;
-  const filtered = hospitals.filter((h) => {
-    const cityMatch = !params.city || h.city === params.city;
-    const specialtyMatch =
-      !params.specialty ||
-      h.specialties.some(
-        (s) => s.toLowerCase().replace(/[^a-z]+/g, "-") === params.specialty
-      );
-    return cityMatch && specialtyMatch;
-  });
+  const { data: results } = await searchHospitals({ city: params.city, specialty: params.specialty });
+
+  const cards = results.map((h) => ({
+    slug: h.slug,
+    name: h.name,
+    cityLabel: cities.find((c) => c.slug === h.citySlug)?.name ?? h.citySlug,
+    specialties: [] as string[],
+    rating: Number(h.rating),
+    reviewCount: h.reviewCount,
+    priceTier: h.priceTier,
+  }));
 
   return (
     <>
@@ -105,11 +108,11 @@ export default async function HospitalsPage({
 
         <div>
           <p className="mb-4 text-sm text-neutral-500">
-            {filtered.length} hospital{filtered.length === 1 ? "" : "s"} found
+            {cards.length} hospital{cards.length === 1 ? "" : "s"} found
           </p>
-          {filtered.length > 0 ? (
+          {cards.length > 0 ? (
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {filtered.map((h) => (
+              {cards.map((h) => (
                 <HospitalCard key={h.slug} hospital={h} />
               ))}
             </div>

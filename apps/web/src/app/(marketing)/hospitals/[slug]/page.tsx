@@ -6,10 +6,14 @@ import { Badge, VerifiedBadge } from "@/components/Badge";
 import { Stars } from "@/components/Stars";
 import { Button } from "@/components/Button";
 import { DoctorCard } from "@/components/DoctorCard";
-import { hospitals } from "@/data/hospitals";
+import { cities, specialties } from "@/data/hospitals";
+import { searchHospitals, getHospital, listDoctors, listPackages, listHospitalReviews } from "@/lib/api";
 
-export function generateStaticParams() {
-  return hospitals.map((h) => ({ slug: h.slug }));
+async function findHospitalBySlug(slug: string) {
+  const { data } = await searchHospitals();
+  const match = data.find((h) => h.slug === slug);
+  if (!match) return null;
+  return getHospital(match.id);
 }
 
 export async function generateMetadata({
@@ -18,7 +22,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const hospital = hospitals.find((h) => h.slug === slug);
+  const hospital = await findHospitalBySlug(slug);
   if (!hospital) return {};
   return {
     title: hospital.name,
@@ -32,8 +36,19 @@ export default async function HospitalDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const hospital = hospitals.find((h) => h.slug === slug);
+  const hospital = await findHospitalBySlug(slug);
   if (!hospital) notFound();
+
+  const [doctors, packages, reviews] = await Promise.all([
+    listDoctors(hospital.id),
+    listPackages(hospital.id),
+    listHospitalReviews(hospital.id),
+  ]);
+
+  const cityLabel = cities.find((c) => c.slug === hospital.citySlug)?.name ?? hospital.citySlug;
+  const hospitalSpecialties = Array.from(
+    new Set([...doctors.map((d) => d.specialtySlug), ...packages.map((p) => p.specialtySlug)]),
+  ).map((slug) => specialties.find((s) => s.slug === slug)?.name ?? slug);
 
   return (
     <>
@@ -42,9 +57,9 @@ export default async function HospitalDetailPage({
           <VerifiedBadge label="Verified Hospital" />
           <h1 className="text-3xl font-bold sm:text-4xl">{hospital.name}</h1>
           <div className="flex flex-wrap items-center gap-4 text-primary-100">
-            <span>{hospital.cityLabel}, China</span>
+            <span>{cityLabel}, China</span>
             <span className="text-white">
-              <Stars rating={hospital.rating} />
+              <Stars rating={Number(hospital.rating)} />
             </span>
             <span>{hospital.reviewCount} reviews</span>
             <span>{hospital.priceTier}</span>
@@ -87,7 +102,7 @@ export default async function HospitalDetailPage({
             <h2 className="mb-3 text-xl font-bold text-neutral-900">Overview</h2>
             <p className="text-neutral-700">{hospital.description}</p>
             <div className="mt-5 flex flex-wrap gap-2">
-              {hospital.specialties.map((s) => (
+              {hospitalSpecialties.map((s) => (
                 <Badge key={s} tone="primary">
                   {s}
                 </Badge>
@@ -109,8 +124,20 @@ export default async function HospitalDetailPage({
           <section id="doctors" className="scroll-mt-32">
             <h2 className="mb-4 text-xl font-bold text-neutral-900">Doctors</h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              {hospital.doctors.map((doc) => (
-                <DoctorCard key={doc.slug} doctor={doc} hospitalSlug={hospital.slug} />
+              {doctors.map((doc) => (
+                <DoctorCard
+                  key={doc.slug}
+                  doctor={{
+                    slug: doc.slug,
+                    name: doc.name,
+                    specialty: specialties.find((s) => s.slug === doc.specialtySlug)?.name ?? doc.specialtySlug,
+                    credentials: doc.credentials,
+                    yearsExperience: doc.yearsExperience,
+                    languages: doc.languages,
+                    bio: doc.bio,
+                  }}
+                  hospitalSlug={hospital.slug}
+                />
               ))}
             </div>
           </section>
@@ -118,16 +145,16 @@ export default async function HospitalDetailPage({
           <section id="packages" className="scroll-mt-32">
             <h2 className="mb-4 text-xl font-bold text-neutral-900">Treatment packages</h2>
             <div className="flex flex-col gap-4">
-              {hospital.packages.map((pkg) => (
+              {packages.map((pkg) => (
                 <div
-                  key={pkg.name}
+                  key={pkg.id}
                   className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h3 className="font-bold text-neutral-900">{pkg.name}</h3>
                     <span className="font-semibold text-primary-700">
-                      ${pkg.priceRangeUsd[0].toLocaleString()}–$
-                      {pkg.priceRangeUsd[1].toLocaleString()}
+                      ${Number(pkg.priceMinUsd).toLocaleString()}–$
+                      {Number(pkg.priceMaxUsd).toLocaleString()}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-neutral-600">{pkg.description}</p>
@@ -150,9 +177,12 @@ export default async function HospitalDetailPage({
           <section id="reviews" className="scroll-mt-32">
             <h2 className="mb-4 text-xl font-bold text-neutral-900">Patient reviews</h2>
             <div className="flex flex-col gap-4">
-              {hospital.reviews.map((r) => (
+              {reviews.length === 0 ? (
+                <p className="text-sm text-neutral-500">No published reviews yet.</p>
+              ) : null}
+              {reviews.map((r) => (
                 <div
-                  key={r.patientName + r.date}
+                  key={r.id}
                   className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm"
                 >
                   <div className="flex items-center justify-between">
@@ -160,9 +190,6 @@ export default async function HospitalDetailPage({
                     <Badge tone="primary">Verified Patient</Badge>
                   </div>
                   <p className="mt-2 text-sm text-neutral-700">&ldquo;{r.text}&rdquo;</p>
-                  <p className="mt-2 text-xs font-semibold text-neutral-500">
-                    {r.patientName} &middot; {r.country} &middot; {r.treatment}
-                  </p>
                 </div>
               ))}
             </div>

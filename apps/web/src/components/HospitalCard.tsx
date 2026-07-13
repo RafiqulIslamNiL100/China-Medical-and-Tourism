@@ -1,9 +1,18 @@
 import Link from "next/link";
-import type { Hospital } from "@/data/hospitals";
 import { Stars } from "./Stars";
 import { VerifiedBadge } from "./Badge";
 
-export function HospitalCard({ hospital }: { hospital: Hospital }) {
+export type HospitalCardData = {
+  slug: string;
+  name: string;
+  cityLabel: string;
+  specialties: string[];
+  rating: number;
+  reviewCount: number;
+  priceTier: string;
+};
+
+export function HospitalCard({ hospital }: { hospital: HospitalCardData }) {
   return (
     <Link
       href={`/hospitals/${hospital.slug}`}
@@ -19,7 +28,8 @@ export function HospitalCard({ hospital }: { hospital: Hospital }) {
           {hospital.name}
         </h3>
         <p className="text-xs text-neutral-500">
-          {hospital.cityLabel} &middot; {hospital.specialties.slice(0, 2).join(", ")}
+          {hospital.cityLabel}
+          {hospital.specialties.length > 0 ? ` · ${hospital.specialties.slice(0, 2).join(", ")}` : ""}
         </p>
         <div className="mt-auto flex items-center justify-between pt-2">
           <Stars rating={hospital.rating} />
