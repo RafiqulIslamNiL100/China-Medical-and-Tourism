@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { Public } from "../../common/decorators/public.decorator";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
@@ -12,6 +13,10 @@ import {
   VerifyDto,
 } from "./dto/auth.dto";
 
+// Stricter rate limit than the global 100/min for everything under /auth —
+// these endpoints are the brute-force surface (credentials, OTP codes, reset
+// tokens), per NFR-SEC-04. 10 requests per minute per client IP.
+@Throttle({ default: { ttl: 60_000, limit: 10 } })
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

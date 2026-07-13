@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { StorageService } from "./storage/storage.service";
 import { EmailService } from "./email/email.service";
 import { NotificationService } from "./notifications/notification.service";
@@ -14,6 +15,9 @@ import { HttpExceptionFilter } from "./filters/http-exception.filter";
 @Global()
 @Module({
   imports: [
+    // Global rate limit: 100 requests/minute per client IP. Auth endpoints carry much
+    // stricter per-route @Throttle overrides — see auth.controller.ts (NFR-SEC-04).
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -30,6 +34,7 @@ import { HttpExceptionFilter } from "./filters/http-exception.filter";
     NotificationService,
     AuditService,
     MockPaymentProcessor,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

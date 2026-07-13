@@ -27,7 +27,9 @@ const {
 const argon2 = require("argon2");
 
 const prisma = new PrismaClient();
-const DEMO_PASSWORD = "Passw0rd!23";
+// Override with SEED_DEMO_PASSWORD when seeding any shared/production environment —
+// the default below is written in a public repo and must never guard real accounts.
+const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || "Passw0rd!23";
 
 async function main() {
   const alreadySeeded = await prisma.hospital.findFirst();
@@ -748,7 +750,9 @@ async function main() {
   });
   console.log("Seeded commission rates, platform settings, and 3 published articles.");
 
-  console.log("\nDemo accounts (all share password: Passw0rd!23):");
+  console.log(
+    `\nDemo accounts (all share ${process.env.SEED_DEMO_PASSWORD ? "the password from SEED_DEMO_PASSWORD" : "password: Passw0rd!23"}):`,
+  );
   console.log("  admin           sarah.chen@cmt-platform.com");
   console.log("  hospital_staff  jing.zhao@buf-hospital.cn (Beijing United Family Hospital)");
   console.log("  case_manager    li.wei@cmt-platform.com");
