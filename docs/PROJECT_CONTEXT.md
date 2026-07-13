@@ -443,6 +443,12 @@ Payments, Reviews, Notifications, CMS, Admin.
   `RESEND_API_KEY` is set; falls back to the original console-log behavior when it
   isn't, so nothing breaks if the key is absent. `NotificationService` resolves the
   recipient's real email from the `User` table before sending.
+- `SmsService` — real SMS via Twilio (`twilio` npm package) when `TWILIO_ACCOUNT_SID`/
+  `TWILIO_AUTH_TOKEN`/`TWILIO_FROM_NUMBER` are all set; falls back to a console-log
+  stand-in otherwise. `NotificationService.notify()` sends SMS when the recipient has
+  `NotificationPreference.smsEnabled` — a column that existed in the schema since
+  Phase 6 but had no dispatch path wired to it until now. Defaults to off (unlike
+  email/in-app) since SMS costs real money per message even for a configured account.
 - `StorageService` — S3-compatible storage (AWS SDK v3, `@aws-sdk/client-s3` +
   `s3-request-presigner`) when all four `S3_*` env vars are set (works with AWS S3,
   Cloudflare R2, Railway Buckets, or MinIO via `S3_ENDPOINT`), including presigned
@@ -450,16 +456,27 @@ Payments, Reviews, Notifications, CMS, Admin.
   Neither this repo nor this environment has real S3/R2 credentials, so this remains
   unexercised against a real bucket — the code path is written and build-verified, not
   live-verified.
-- `MockPaymentProcessor` — unchanged from Phase 5; still the only payment path (no
-  Stripe account exists to integrate against). The token `"tok_decline"` is a
-  documented test hook that simulates a processor decline (exercising the real `402`
-  path); any other token "succeeds." No real card data ever flows through this — the
-  spec's `paymentMethodToken` field is designed to only ever carry an opaque tokenized
-  reference from a real client-side SDK in production.
-- Payment receipts (`GET /invoices/{id}/receipt`) are still served as plain text, not
-  PDF — no PDF-rendering library is available in this environment. The response is
-  honestly labeled as a development placeholder rather than mislabeled as
-  `application/pdf`.
+- `PaymentProcessorService` — real Stripe integration (`stripe` npm package, PaymentIntents
+  API) when `STRIPE_SECRET_KEY` is set; falls back to the original mock behavior
+  otherwise (any `paymentMethodToken` "succeeds" except the literal `"tok_decline"`,
+  which simulates a decline). In Stripe mode, `paymentMethodToken` must be a real
+  Stripe PaymentMethod id (Stripe's documented test cards, e.g. `"pm_card_visa"` /
+  `"pm_card_chargeDeclined"` — never real card data). Real Stripe refunds are issued
+  against the original charge's PaymentIntent id (`Payment.gatewayRef`, a new nullable
+  column added specifically to carry the gateway's own transaction reference — kept
+  separate from `Payment.providerRef`, which continues to mean our own idempotency key
+  as before, so idempotency semantics didn't change). A `POST /payments/webhook/stripe`
+  endpoint (signature-verified via `STRIPE_WEBHOOK_SECRET`, `@Public()` since Stripe
+  itself is the caller) exists as the correct extension point for async events — the
+  current integration confirms card payments synchronously, so nothing depends on the
+  webhook firing yet, but production Stripe use (3D Secure, disputes) should build on
+  it rather than add a second one. Neither this repo nor this environment has a real
+  Stripe account, so — like S3 above — this is code-complete and build/logic-verified
+  against the mock path (charge, decline, refund, idempotency all exercised via curl
+  with real seeded accounts) but not live-verified against Stripe's actual API.
+- Payment receipts (`GET /invoices/{id}/receipt`) are now a real PDF, rendered
+  server-side with `pdfkit` (no headless browser required) — verified by downloading
+  and inspecting an actual generated receipt (valid single-page PDF).
 
 **Testing & CI:**
 - `services/api/test/smoke.mjs` — a zero-dependency (no test framework) end-to-end
@@ -474,10 +491,15 @@ Payments, Reviews, Notifications, CMS, Admin.
 - Still no unit/integration test suite for individual business-logic functions — the
   smoke test is a real but shallow end-to-end check, not a substitute for one. This
   remains the most significant testing gap.
-- `npm audit` on `services/api` shows vulnerabilities confined to dev-only build
-  tooling (`@nestjs/cli`'s transitive deps — webpack, inquirer, tmp), not runtime
-  dependencies; fixing requires a `@nestjs/cli` v10→v11 major bump, deliberately
-  deferred rather than done reflexively.
+- `npm audit` on `services/api` shows two categories of pre-existing findings, neither
+  newly introduced by this round of work: dev-only build tooling
+  (`@nestjs/cli`'s transitive deps — webpack, inquirer, tmp), and a moderate `qs`
+  advisory (DoS via `qs.stringify` on malformed comma-format array input) pulled in
+  transitively by `@nestjs/platform-express`'s own `express`/`body-parser` dependency
+  — not something this codebase calls into directly (it doesn't hand-construct query
+  strings from array input), but present in the dependency tree. Fixing either
+  requires a major version bump (`@nestjs/cli` v10→v11, `@nestjs/platform-express`
+  v10→v11), deliberately deferred rather than done reflexively mid-session.
 
 **Deployment:** a production `Dockerfile` (`services/api/Dockerfile`, multi-stage,
 workspace-aware) and `GET /health` (`{status, timestamp}`, checks DB connectivity,
@@ -532,7 +554,11 @@ done in this environment — not a vague "needs more work."
 - [x] Real authorization (role guards + service-layer row-level scoping, not just UI).
 - [x] Rate limiting, CORS allowlist, helmet security headers.
 - [x] Real transactional email via Resend (credential-gated, degrades gracefully).
+- [x] Real SMS via Twilio (credential-gated, degrades gracefully) — see §17.
 - [x] Real S3-compatible storage adapter written and build-verified (credential-gated).
+- [x] Real Stripe payment processor (charge, decline, refund, webhook signature
+      verification) — code-complete and logic-verified, credential-gated (§17).
+- [x] Real PDF payment receipts (pdfkit) — replaces the old plain-text placeholder.
 - [x] Append-only audit log for sensitive actions.
 - [x] Idempotent payment/refund endpoints (`Idempotency-Key` header).
 - [x] Production Dockerfile, `/health` endpoint, and a real deployment (Railway +
@@ -541,14 +567,18 @@ done in this environment — not a vague "needs more work."
 - [x] Demo-password rotation script, ready to run against a production database.
 
 **Requires a real credential this environment cannot obtain — code is ready, activation
-is a config change, not a rewrite:**
-- [ ] **Real payment processing.** Needs a live Stripe (or equivalent) account.
-      `MockPaymentProcessor` implements the same interface a real one would — swapping
-      it in means implementing `charge()`/`refund()` against the real SDK and setting
-      the resulting API keys as env vars, not restructuring the payments module.
-- [ ] **Persistent file storage.** Needs a real S3/R2/MinIO bucket + access keys.
-      `StorageService` already supports this — set the four `S3_*` env vars documented
-      in `DEPLOYMENT.md` and it activates with no code changes.
+is an env var change, not a rewrite:**
+- [ ] **Real payment processing.** Needs a live Stripe account. Set `STRIPE_SECRET_KEY`
+      (and `STRIPE_WEBHOOK_SECRET` if you want webhook events verified) — no code
+      changes required. Start with Stripe's **test-mode** keys and test cards
+      (`pm_card_visa`, etc.) before ever touching live-mode keys.
+- [ ] **Persistent file storage.** Needs a real S3/R2/MinIO bucket + access keys. Set
+      the four `S3_*` env vars documented in `DEPLOYMENT.md` — no code changes
+      required.
+- [ ] **Real SMS delivery.** Needs a Twilio account with a purchased phone number. Set
+      `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_FROM_NUMBER` — no code changes
+      required. Users additionally need `smsEnabled: true` on the relevant
+      `NotificationPreference` row, since SMS defaults to opt-in.
 
 **Operational steps for whoever runs the production deployment (not code changes):**
 - [ ] Run `database/prisma/rotate-demo-passwords.js` against the production database,
@@ -559,12 +589,13 @@ is a config change, not a rewrite:**
       only).
 - [ ] Rotate `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` to values generated with
       `openssl rand -hex 32` if the deployment ever used the repo's dev placeholders.
-- [ ] Decide on a real PDF-generation approach for payment receipts (currently plain
-      text) if that's a real product requirement, not just a demo gap.
+- [ ] If enabling Stripe, register the webhook endpoint
+      (`https://<backend-domain>/v1/payments/webhook/stripe`) in the Stripe dashboard
+      and copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
 
 **Deliberately out of scope for this project as an AI-built demonstration, regardless
 of environment:**
 - A real business entity, medical-licensing compliance review, and legal review of the
   privacy policy / terms of service (both are explicitly marked draft — see §4).
-- SMS/OTP via a real provider (Twilio or similar) — email OTP is fully real; SMS was
-  never implemented, only specified in the architecture docs (§5).
+- Unit/integration test coverage for individual business-logic functions (§17's testing
+  gap) — the smoke test is real but shallow.

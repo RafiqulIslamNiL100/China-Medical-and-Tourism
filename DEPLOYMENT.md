@@ -46,11 +46,21 @@ In the same Railway project: **New → GitHub Repo** → select this repo.
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Credentials for the bucket above |
 | `S3_REGION` | Bucket region, e.g. `auto` for Cloudflare R2, `us-east-1` for AWS |
 | `S3_ENDPOINT` | Only needed for non-AWS S3-compatible providers (Cloudflare R2, Railway Buckets, MinIO) — omit for real AWS S3 |
+| `STRIPE_SECRET_KEY` | Your Stripe **secret** key (optional — omit it and payments are simulated by the built-in mock processor). Use a `sk_test_...` key until you're genuinely ready to take real payments |
+| `STRIPE_PUBLISHABLE_KEY` | Your Stripe **publishable** key (optional — only needed if/when the frontend integrates Stripe.js directly) |
+| `STRIPE_WEBHOOK_SECRET` | The signing secret for the webhook endpoint below (optional — only needed to verify `POST /v1/payments/webhook/stripe`) |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | Your Twilio credentials (optional — omit them and SMS just logs server-side instead of sending) |
+| `TWILIO_FROM_NUMBER` | A phone number you own on Twilio, in E.164 format, e.g. `+15551234567` |
 
 Generate strong secrets with `openssl rand -hex 32` (run locally, don't reuse the repo's
-dev placeholders). All four S3 variables must be set together for `StorageService` to use
-real object storage — set none of them and it falls back to local-disk storage (see
-"Known limitations" below).
+dev placeholders). All four `S3_*` variables must be set together for `StorageService`
+to use real object storage; all three `TWILIO_*` variables must be set together for
+`SmsService` to send real SMS — partial sets fall back to the mock/local/console
+behavior, same pattern as everything else in this table.
+
+If you set `STRIPE_SECRET_KEY`, also register a webhook endpoint in the Stripe
+dashboard pointing at `https://<your-backend-domain>/v1/payments/webhook/stripe`, and
+copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
 
 Deploy. The container's `CMD` runs `prisma migrate deploy` automatically before starting
 the server, so the database schema is created on first boot — no manual migration step.
@@ -96,11 +106,16 @@ bugs — worth knowing about before treating the live site as fully production-r
   restart. The code already supports real S3-compatible storage (AWS S3, Cloudflare R2,
   Railway Buckets, MinIO) — set the four `S3_*` variables above and it activates
   automatically, no code changes needed.
-- **Payments are mocked.** `MockPaymentProcessor` never touches a real payment
-  network — every token except the literal string `"tok_decline"` "succeeds." No real
-  money moves. Swapping in Stripe (or similar) means implementing the same
-  `charge()` interface against their SDK — this has not been started, since it requires
-  a real Stripe account this environment doesn't have.
+- **Payments are mocked unless `STRIPE_SECRET_KEY` is set.** Without it, every token
+  except the literal string `"tok_decline"` "succeeds" and no real money moves. The
+  code already supports real Stripe payments — set `STRIPE_SECRET_KEY` and it
+  activates automatically. In Stripe mode, `paymentMethodToken` must be a real Stripe
+  PaymentMethod id (a Stripe test card like `"pm_card_visa"`, never real card data)
+  rather than the mock path's `"tok_visa"`-style token.
+- **SMS is logged to the console unless all three `TWILIO_*` vars are set.** The code
+  already supports real SMS via Twilio; set the three variables above and it
+  activates automatically. Recipients also need `smsEnabled: true` on their
+  notification preferences, since SMS defaults to opt-in (unlike email).
 - **Demo account passwords are public.** Every seeded account shares the password
   `Passw0rd!23`, documented in this repo. Before treating a production database as real,
   run `database/prisma/rotate-demo-passwords.js` (see its header comment) to set a real,

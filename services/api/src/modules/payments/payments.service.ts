@@ -1,9 +1,10 @@
 import { HttpStatus, Injectable, StreamableFile } from "@nestjs/common";
 import { InvoiceStatus, PartnerType, UserRole } from "@prisma/client";
+import PDFDocument from "pdfkit";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { NotificationService } from "../../common/notifications/notification.service";
 import { AuditService } from "../../common/audit/audit.service";
-import { MockPaymentProcessor } from "../../common/payments/mock-payment-processor.service";
+import { PaymentProcessorService } from "../../common/payments/payment-processor.service";
 import { AppException } from "../../common/filters/app-exception";
 import { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { ListPaymentsQuery, PayInvoiceDto, RefundDto, SetCommissionRateDto } from "./dto/payments.dto";
@@ -14,7 +15,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationService,
     private readonly audit: AuditService,
-    private readonly processor: MockPaymentProcessor,
+    private readonly processor: PaymentProcessorService,
   ) {}
 
   async listInvoices(user: AuthenticatedUser, applicationId: string) {
@@ -29,7 +30,7 @@ export class PaymentsService {
     }
 
     const existing = await this.prisma.payment.findUnique({
-      where: { provider_providerRef: { provider: "mock", providerRef: idempotencyKey } },
+      where: { provider_providerRef: { provider: this.processor.providerName, providerRef: idempotencyKey } },
     });
     if (existing) return existing;
 
@@ -40,17 +41,22 @@ export class PaymentsService {
       throw AppException.conflict("PRECONDITION_FAILED", "This invoice is not due for payment.");
     }
 
-    const result = await this.processor.charge(dto.paymentMethodToken);
+    const result = await this.processor.charge(dto.paymentMethodToken, Number(invoice.amountUsd));
     if (!result.success) {
-      throw new AppException(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_DECLINED", "The payment was declined by the processor.");
+      throw new AppException(
+        HttpStatus.PAYMENT_REQUIRED,
+        "PAYMENT_DECLINED",
+        result.declineReason ?? "The payment was declined by the processor.",
+      );
     }
 
     const payment = await this.prisma.payment.create({
       data: {
         invoiceId: invoice.id,
         amountUsd: invoice.amountUsd,
-        provider: "mock",
+        provider: this.processor.providerName,
         providerRef: idempotencyKey,
+        gatewayRef: result.gatewayRef,
       },
     });
     await this.prisma.invoice.update({ where: { id: invoice.id }, data: { status: InvoiceStatus.Paid } });
@@ -86,21 +92,48 @@ export class PaymentsService {
     const payment = await this.prisma.payment.findFirst({ where: { invoiceId: invoice.id }, orderBy: { paidAt: "desc" } });
     const application = await this.prisma.application.findUniqueOrThrow({ where: { id: invoice.applicationId } });
 
-    const text = [
-      "RECEIPT",
-      "",
-      `Case reference: ${application.refNumber}`,
-      `Invoice: ${invoice.description}`,
-      `Amount: $${invoice.amountUsd.toString()} USD`,
-      `Status: ${invoice.status}`,
-      payment ? `Paid at: ${payment.paidAt.toISOString()}` : "Not yet paid.",
-      "",
-      "(Development placeholder — no PDF rendering library is available in this",
-      "environment, so this receipt is served as plain text; a production build",
-      "renders a real PDF per FR-PAY-05.)",
-    ].join("\n");
+    const pdf = await this.renderReceiptPdf({ invoice, payment, application });
+    return new StreamableFile(pdf, { type: "application/pdf", disposition: `attachment; filename="receipt-${invoice.id}.pdf"` });
+  }
 
-    return new StreamableFile(Buffer.from(text), { type: "text/plain" });
+  /** FR-PAY-05: a real PDF, not a stand-in — rendered server-side with pdfkit (no headless browser needed). */
+  private renderReceiptPdf(input: {
+    invoice: { id: string; description: string; amountUsd: { toString(): string }; status: string; dueDate: Date | null };
+    payment: { paidAt: Date; provider: string; providerRef: string } | null;
+    application: { refNumber: string };
+  }): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: "A4", margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on("data", (chunk) => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", reject);
+
+      doc.fontSize(20).text("China Medical and Tourism", { align: "left" });
+      doc.fontSize(10).fillColor("#666666").text("Payment Receipt", { align: "left" });
+      doc.moveDown(2);
+
+      doc.fillColor("#000000").fontSize(12);
+      const row = (label: string, value: string) => {
+        doc.font("Helvetica-Bold").text(label, { continued: true }).font("Helvetica").text(`  ${value}`);
+        doc.moveDown(0.5);
+      };
+
+      row("Case reference:", input.application.refNumber);
+      row("Invoice:", input.invoice.description);
+      row("Amount:", `$${input.invoice.amountUsd.toString()} USD`);
+      row("Status:", input.invoice.status);
+      row("Paid at:", input.payment ? input.payment.paidAt.toISOString() : "Not yet paid.");
+      if (input.payment) {
+        row("Payment method:", input.payment.provider === "stripe" ? "Card (via Stripe)" : "Test payment");
+        row("Reference:", input.payment.providerRef);
+      }
+
+      doc.moveDown(2);
+      doc.fontSize(9).fillColor("#999999").text("This receipt was generated automatically and does not require a signature.");
+
+      doc.end();
+    });
   }
 
   async refund(user: AuthenticatedUser, paymentId: string, idempotencyKey: string, dto: RefundDto) {
@@ -121,6 +154,8 @@ export class PaymentsService {
       throw AppException.validation("Refund amount exceeds the remaining refundable balance.");
     }
 
+    const gatewayResult = await this.processor.refund(payment.gatewayRef, dto.amountUsd);
+
     const refund = await this.prisma.refund.create({
       data: {
         paymentId: payment.id,
@@ -128,6 +163,7 @@ export class PaymentsService {
         reason: dto.reason,
         processedByUserId: user.userId,
         idempotencyKey,
+        gatewayRef: gatewayResult.gatewayRef,
       },
     });
 
@@ -239,5 +275,26 @@ export class PaymentsService {
 
   private requireRole(user: AuthenticatedUser, roles: UserRole[]) {
     if (!roles.includes(user.role)) throw AppException.forbidden();
+  }
+
+  /**
+   * Verifies and logs Stripe webhook events. The current integration confirms card
+   * payments synchronously in payInvoice() (PaymentIntents with confirm: true), so a
+   * webhook isn't required for the simple card flow to work — this endpoint exists as
+   * the correct extension point for a production integration that also handles
+   * asynchronous events (3D Secure follow-up, disputes, delayed payment methods),
+   * rather than silently having no webhook at all.
+   */
+  async handleStripeWebhook(rawBody: Buffer, signature: string) {
+    let event;
+    try {
+      event = this.processor.verifyWebhookSignature(rawBody, signature);
+    } catch {
+      throw AppException.validation("Invalid Stripe webhook signature.");
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(`[Stripe webhook] received ${event.type} (${event.id})`);
+    return { received: true };
   }
 }

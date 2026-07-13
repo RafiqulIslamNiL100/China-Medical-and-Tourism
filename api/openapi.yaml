@@ -441,8 +441,12 @@ components:
         id: { type: string, format: uuid }
         invoiceId: { type: string, format: uuid }
         amountUsd: { type: number }
-        provider: { type: string, example: stripe }
-        providerRef: { type: string }
+        provider: { type: string, example: stripe, description: "\"stripe\" once STRIPE_SECRET_KEY is configured, \"mock\" otherwise" }
+        providerRef: { type: string, description: "The Idempotency-Key this payment was created with — used for our own dedup lookups, not the gateway's transaction id." }
+        gatewayRef:
+          type: string
+          nullable: true
+          description: "Real gateway transaction reference (e.g. Stripe PaymentIntent id). Only set in Stripe mode."
         paidAt: { type: string, format: date-time }
 
     CreatePaymentRequest:
@@ -450,7 +454,9 @@ components:
       required: [invoiceId, paymentMethodToken]
       properties:
         invoiceId: { type: string, format: uuid }
-        paymentMethodToken: { type: string, description: "Tokenized payment method from the client-side payment provider SDK — never a raw card number, per NFR-SEC-03" }
+        paymentMethodToken:
+          type: string
+          description: "Tokenized payment method from the client-side payment provider SDK — never a raw card number, per NFR-SEC-03. In Stripe mode this must be a real Stripe PaymentMethod id (e.g. a Stripe test card like \"pm_card_visa\")."
 
     Refund:
       type: object
@@ -459,6 +465,10 @@ components:
         paymentId: { type: string, format: uuid }
         amountUsd: { type: number }
         reason: { type: string }
+        gatewayRef:
+          type: string
+          nullable: true
+          description: "Real gateway refund reference (e.g. Stripe Refund id). Only set in Stripe mode."
         createdAt: { type: string, format: date-time }
 
     CommissionRate:
@@ -1834,6 +1844,31 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Payment" }
                   meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /payments/webhook/stripe:
+    post:
+      operationId: postPaymentsWebhookStripe
+      tags: [Payments]
+      summary: Stripe webhook receiver — called by Stripe, not by the frontend
+      description: >
+        Authenticated via the `stripe-signature` header (verified against
+        STRIPE_WEBHOOK_SECRET) instead of a bearer JWT, since Stripe itself is the
+        caller. The current integration confirms card payments synchronously in
+        POST /invoices/{invoiceId}/pay, so this endpoint isn't on the critical path for
+        the simple card flow — it verifies and logs events, and is the correct
+        extension point for a production integration that also needs to react to
+        asynchronous events (3D Secure follow-up, disputes).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: A raw Stripe Event object — signature-verified, not schema-validated.
+      responses:
+        "200": { description: "Signature verified and event logged." }
+        "400": { description: "Missing or invalid stripe-signature header." }
 
   # -------------------------------------------------------------------------
   # Reviews — FR-REVIEW-01 through FR-REVIEW-03

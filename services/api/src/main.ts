@@ -6,7 +6,9 @@ import helmet from "helmet";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: true — needed so the Stripe webhook handler can verify the signature
+  // against the exact bytes Stripe sent, before the body gets JSON-parsed.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // Behind Railway's (or any PaaS) reverse proxy — needed so req.ip reflects the real
   // client for rate limiting rather than the proxy's address.
