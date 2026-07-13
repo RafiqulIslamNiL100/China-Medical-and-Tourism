@@ -62,3 +62,14 @@ export function fmtMoney(value: string | number | null | undefined): string {
 export function statusLabel(status: string): string {
   return status.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
+
+const OPEN_CASE_STATUSES = new Set(["Submitted", "UnderReview", "InfoRequested"]);
+
+/** SLA target: respond within 3 business days of submission (approximated as calendar days). */
+export function slaRiskFor(submittedAt: string, status: string): "on-track" | "at-risk" | "breached" {
+  if (!OPEN_CASE_STATUSES.has(status)) return "on-track";
+  const daysOpen = (Date.now() - new Date(submittedAt).getTime()) / (24 * 60 * 60 * 1000);
+  if (daysOpen >= 3) return "breached";
+  if (daysOpen >= 2) return "at-risk";
+  return "on-track";
+}

@@ -122,7 +122,24 @@ export class ApplicationsService {
       orderBy: { createdAt: "asc" },
       select: { id: true, status: true, note: true, createdAt: true },
     });
-    return { ...application, statusHistory };
+    const [patient, dependent] = await Promise.all([
+      this.prisma.patient.findUnique({
+        where: { id: application.patientId },
+        select: { fullName: true, country: true },
+      }),
+      application.dependentId
+        ? this.prisma.dependent.findUnique({
+            where: { id: application.dependentId },
+            select: { fullName: true, relationship: true },
+          })
+        : Promise.resolve(null),
+    ]);
+    return {
+      ...application,
+      statusHistory,
+      patientName: dependent ? dependent.fullName : (patient?.fullName ?? null),
+      patientCountry: patient?.country ?? null,
+    };
   }
 
   async decide(user: AuthenticatedUser, applicationId: string, dto: ApplicationDecisionDto) {

@@ -140,6 +140,8 @@ export type Application = {
   caseManagerUserId: string | null;
   submittedAt: string;
   statusHistory?: { id: string; status: CaseStatusApi; note: string | null; createdAt: string }[];
+  patientName?: string | null;
+  patientCountry?: string | null;
 };
 
 export type Patient = {

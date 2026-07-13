@@ -289,6 +289,14 @@ components:
         caseManagerUserId: { type: string, format: uuid, nullable: true }
         submittedAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        patientName:
+          type: string
+          nullable: true
+          description: "Present on GET /applications/{id} — the patient's or dependent's full name."
+        patientCountry:
+          type: string
+          nullable: true
+          description: "Present on GET /applications/{id}."
 
     CreateApplicationRequest:
       type: object
