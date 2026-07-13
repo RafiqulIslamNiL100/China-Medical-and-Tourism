@@ -1047,6 +1047,24 @@ paths:
               schema: { $ref: "#/components/schemas/Application" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
+  /applications/case-managers:
+    get:
+      operationId: getApplicationsCaseManagers
+      tags: [Applications]
+      summary: Directory of active case managers, for the ops console's reassign picker (case_manager/admin only)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    userId: { type: string, format: uuid }
+                    email: { type: string, format: email }
+
   /applications/{applicationId}:
     parameters:
       - { $ref: "#/components/parameters/ApplicationIdParam" }
@@ -1504,6 +1522,45 @@ paths:
       summary: Interpreter directory for assignment (case_manager/admin only, Screen 46)
       responses:
         "200": { description: OK. }
+
+  /assignment-board:
+    get:
+      operationId: getAssignmentBoard
+      tags: [Transport]
+      summary: Cross-case transfers and interpreter sessions awaiting or holding an assignment (case_manager/admin only, Screen 46)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transfers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        applicationId: { type: string, format: uuid }
+                        refNumber: { type: string }
+                        direction: { type: string, enum: [Arrival, Departure] }
+                        scheduledAt: { type: string, format: date-time }
+                        pickupLocation: { type: string }
+                        status: { type: string, enum: [Requested, Assigned, Completed, Cancelled] }
+                        assignedTo: { type: string, nullable: true }
+                  interpreterSessions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        applicationId: { type: string, format: uuid }
+                        refNumber: { type: string }
+                        hospitalVisitAt: { type: string, format: date-time }
+                        department: { type: string, nullable: true }
+                        status: { type: string, enum: [Requested, Assigned, Completed, Cancelled] }
+                        assignedTo: { type: string, nullable: true }
 
   /drivers/me/trips:
     get:

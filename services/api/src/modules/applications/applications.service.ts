@@ -232,6 +232,16 @@ export class ApplicationsService {
     return updated;
   }
 
+  async listCaseManagers(user: AuthenticatedUser) {
+    this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
+    const users = await this.prisma.user.findMany({
+      where: { role: UserRole.case_manager, status: "Active" },
+      select: { id: true, email: true },
+      orderBy: { email: "asc" },
+    });
+    return users.map((u) => ({ userId: u.id, email: u.email }));
+  }
+
   async reassign(user: AuthenticatedUser, applicationId: string, dto: ReassignDto) {
     this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
     const application = await this.prisma.application.findUnique({ where: { id: applicationId } });

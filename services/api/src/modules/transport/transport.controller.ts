@@ -88,4 +88,9 @@ export class TransportController {
   listMyAppointments(@CurrentUser() user: AuthenticatedUser) {
     return this.transportService.listMyAppointments(user);
   }
+
+  @Get("assignment-board")
+  listAssignmentBoard(@CurrentUser() user: AuthenticatedUser) {
+    return this.transportService.listAssignmentBoard(user);
+  }
 }

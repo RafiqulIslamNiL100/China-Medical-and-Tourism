@@ -496,6 +496,12 @@ export function reassignApplication(accessToken: string, applicationId: string, 
   });
 }
 
+export type CaseManager = { userId: string; email: string };
+
+export function listCaseManagers(accessToken: string) {
+  return request<CaseManager[]>("/applications/case-managers", { accessToken });
+}
+
 export function listCaseMessages(accessToken: string, applicationId: string) {
   return request<CaseMessage[]>(`/applications/${applicationId}/messages`, { accessToken });
 }
@@ -720,6 +726,34 @@ export function listDrivers(accessToken: string) {
 
 export function listInterpreters(accessToken: string) {
   return request<InterpreterProfile[]>("/interpreters", { accessToken });
+}
+
+export type AssignmentBoardTransfer = {
+  id: string;
+  applicationId: string;
+  refNumber: string;
+  direction: "Arrival" | "Departure";
+  scheduledAt: string;
+  pickupLocation: string;
+  status: "Requested" | "Assigned" | "Completed" | "Cancelled";
+  assignedTo: string | null;
+};
+
+export type AssignmentBoardInterpreterSession = {
+  id: string;
+  applicationId: string;
+  refNumber: string;
+  hospitalVisitAt: string;
+  department: string | null;
+  status: "Requested" | "Assigned" | "Completed" | "Cancelled";
+  assignedTo: string | null;
+};
+
+export function getAssignmentBoard(accessToken: string) {
+  return request<{ transfers: AssignmentBoardTransfer[]; interpreterSessions: AssignmentBoardInterpreterSession[] }>(
+    "/assignment-board",
+    { accessToken },
+  );
 }
 
 // --- CMS ---------------------------------------------------------------------------------------

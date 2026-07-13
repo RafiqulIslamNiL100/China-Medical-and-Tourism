@@ -178,6 +178,48 @@ export class TransportService {
     return this.prisma.interpreter.findMany({ orderBy: { fullName: "asc" } });
   }
 
+  // --- assignment board (ops console) -----------------------------------------------
+
+  async listAssignmentBoard(user: AuthenticatedUser) {
+    this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
+    const openStatuses = [ServiceAssignmentStatus.Requested, ServiceAssignmentStatus.Assigned];
+
+    const [transfers, sessions] = await Promise.all([
+      this.prisma.transferRequest.findMany({
+        where: { deletedAt: null, status: { in: openStatuses } },
+        orderBy: { scheduledAt: "asc" },
+        include: { application: { select: { refNumber: true } }, driver: { select: { fullName: true } } },
+      }),
+      this.prisma.interpreterAssignment.findMany({
+        where: { deletedAt: null, status: { in: openStatuses } },
+        orderBy: { hospitalVisitAt: "asc" },
+        include: { application: { select: { refNumber: true } }, interpreter: { select: { fullName: true } } },
+      }),
+    ]);
+
+    return {
+      transfers: transfers.map((t) => ({
+        id: t.id,
+        applicationId: t.applicationId,
+        refNumber: t.application.refNumber,
+        direction: t.direction,
+        scheduledAt: t.scheduledAt,
+        pickupLocation: t.pickupLocation,
+        status: t.status,
+        assignedTo: t.driver?.fullName ?? null,
+      })),
+      interpreterSessions: sessions.map((s) => ({
+        id: s.id,
+        applicationId: s.applicationId,
+        refNumber: s.application.refNumber,
+        hospitalVisitAt: s.hospitalVisitAt,
+        department: s.department,
+        status: s.status,
+        assignedTo: s.interpreter?.fullName ?? null,
+      })),
+    };
+  }
+
   // --- internal helpers -----------------------------------------------------------
 
   private async notifyPatient(applicationId: string, title: string, body: string) {

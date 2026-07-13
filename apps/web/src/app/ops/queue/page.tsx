@@ -1,30 +1,42 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/Badge";
 import { SlaChip } from "@/components/portal/SlaChip";
-import { opsCases } from "@/data/opsConsole";
+import { useAuth } from "@/lib/auth-client";
+import { statusLabel, fmtDate, slaRiskFor } from "@/lib/portal";
+import { listApplications, searchHospitals, type Application } from "@/lib/api";
 
-export const metadata: Metadata = { title: "Case Queue" };
+const views = [
+  { key: "all", label: "All Cases" },
+  { key: "mine", label: "My Cases" },
+  { key: "urgent", label: "Urgent" },
+  { key: "unassigned", label: "Unassigned" },
+];
 
-export default async function OpsQueuePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ view?: string }>;
-}) {
-  const { view = "all" } = await searchParams;
-  const filtered = opsCases.filter((c) => {
-    if (view === "urgent") return c.slaRisk === "breached" || c.slaRisk === "at-risk";
-    if (view === "mine") return c.assignedCaseManager === "Li Wei";
-    if (view === "unassigned") return c.assignedCaseManager === "Unassigned";
-    return true;
-  });
+export default function OpsQueuePage() {
+  const searchParams = useSearchParams();
+  const view = searchParams.get("view") ?? "all";
+  const { accessToken } = useAuth();
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [hospitalNames, setHospitalNames] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
 
-  const views = [
-    { key: "all", label: "All Cases" },
-    { key: "mine", label: "My Cases" },
-    { key: "urgent", label: "Urgent" },
-    { key: "unassigned", label: "Unassigned" },
-  ];
+  useEffect(() => {
+    if (!accessToken) return;
+    setLoading(true);
+    Promise.all([
+      listApplications(accessToken, { view: view === "all" ? undefined : view }),
+      searchHospitals(),
+    ])
+      .then(([apps, hospitals]) => {
+        setApplications(apps.data);
+        setHospitalNames(Object.fromEntries(hospitals.data.map((h) => [h.id, h.name])));
+      })
+      .finally(() => setLoading(false));
+  }, [accessToken, view]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,56 +58,54 @@ export default async function OpsQueuePage({
         ))}
       </div>
 
-      <div className="overflow-x-auto rounded-[10px] border border-neutral-300 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b border-neutral-300 bg-neutral-100 text-left text-xs font-semibold text-neutral-500 uppercase">
-            <tr>
-              <th className="px-4 py-3">Patient</th>
-              <th className="px-4 py-3">Hospital</th>
-              <th className="px-4 py-3">Case Manager</th>
-              <th className="px-4 py-3">Travel Date</th>
-              <th className="px-4 py-3">SLA</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((c) => (
-              <tr key={c.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-100/50">
-                <td className="px-4 py-3">
-                  <Link href={`/ops/cases/${c.id}`} className="font-semibold text-primary-700">
-                    {c.patientName}
-                  </Link>
-                  <p className="text-xs text-neutral-500">
-                    {c.refNumber} &middot; {c.patientCountry}
-                  </p>
-                </td>
-                <td className="px-4 py-3 text-neutral-700">{c.hospitalName}</td>
-                <td className="px-4 py-3 text-neutral-700">
-                  {c.assignedCaseManager === "Unassigned" ? (
-                    <Badge tone="warning">Unassigned</Badge>
-                  ) : (
-                    c.assignedCaseManager
-                  )}
-                </td>
-                <td className="px-4 py-3 text-neutral-500">{c.travelDate ?? "TBC"}</td>
-                <td className="px-4 py-3">
-                  <SlaChip risk={c.slaRisk} />
-                </td>
-                <td className="px-4 py-3">
-                  <Badge>{c.status}</Badge>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 ? (
+      {loading ? (
+        <p className="text-sm text-neutral-500">Loading…</p>
+      ) : (
+        <div className="overflow-x-auto rounded-[10px] border border-neutral-300 bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="border-b border-neutral-300 bg-neutral-100 text-left text-xs font-semibold text-neutral-500 uppercase">
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-neutral-500">
-                  No cases in this view.
-                </td>
+                <th className="px-4 py-3">Reference</th>
+                <th className="px-4 py-3">Hospital</th>
+                <th className="px-4 py-3">Case Manager</th>
+                <th className="px-4 py-3">Submitted</th>
+                <th className="px-4 py-3">SLA</th>
+                <th className="px-4 py-3">Status</th>
               </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {applications.map((c) => (
+                <tr key={c.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-100/50">
+                  <td className="px-4 py-3">
+                    <Link href={`/ops/cases/${c.id}`} className="font-semibold text-primary-700">
+                      {c.refNumber}
+                    </Link>
+                    <p className="text-xs text-neutral-500">{c.specialtySlug}</p>
+                  </td>
+                  <td className="px-4 py-3 text-neutral-700">{hospitalNames[c.hospitalId] ?? "—"}</td>
+                  <td className="px-4 py-3 text-neutral-700">
+                    {c.caseManagerUserId ? "Assigned" : <Badge tone="warning">Unassigned</Badge>}
+                  </td>
+                  <td className="px-4 py-3 text-neutral-500">{fmtDate(c.submittedAt)}</td>
+                  <td className="px-4 py-3">
+                    <SlaChip risk={slaRiskFor(c.submittedAt, c.status)} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge>{statusLabel(c.status)}</Badge>
+                  </td>
+                </tr>
+              ))}
+              {applications.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-neutral-500">
+                    No cases in this view.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

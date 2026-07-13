@@ -24,6 +24,14 @@ export class ApplicationsController {
     return this.applicationsService.create(user.userId, dto);
   }
 
+  // Directory endpoint for the ops console's reassign picker (Screen 46). Must be
+  // registered before :applicationId below, or "case-managers" would be captured
+  // as an applicationId.
+  @Get("case-managers")
+  listCaseManagers(@CurrentUser() user: AuthenticatedUser) {
+    return this.applicationsService.listCaseManagers(user);
+  }
+
   @Get(":applicationId")
   getById(@CurrentUser() user: AuthenticatedUser, @Param("applicationId") applicationId: string) {
     return this.applicationsService.getById(user, applicationId);
