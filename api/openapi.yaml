@@ -841,6 +841,18 @@ paths:
                     items: { $ref: "#/components/schemas/Hospital" }
                   meta: { $ref: "#/components/schemas/PaginatedMeta" }
 
+  /hospitals/mine:
+    get:
+      operationId: getHospitalsMine
+      tags: [Hospitals]
+      summary: The authenticated hospital staff member's own hospital (hospital_staff only)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Hospital" }
+
   /hospitals/{hospitalId}:
     parameters:
       - name: hospitalId
@@ -1282,6 +1294,34 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Hotel" }
 
+  /hotels/mine:
+    get:
+      operationId: getHotelsMine
+      tags: [Hotels]
+      summary: The authenticated partner's own hotels with room types (hotel_partner only)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Hotel" }
+
+  /hotel-bookings/me:
+    get:
+      operationId: getHotelBookingsMe
+      tags: [Hotels]
+      summary: The authenticated patient's own case-linked hotel bookings (Screen 15)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/HotelBooking" }
+
   /hotels/{hotelId}/room-types:
     parameters:
       - name: hotelId
@@ -1440,6 +1480,22 @@ paths:
       summary: Mark a transfer complete (driver only, own assignment) (FR-XFER-04)
       responses:
         "200": { description: Completed; unlocks driver payment eligibility per BR-24. }
+
+  /drivers:
+    get:
+      operationId: getDrivers
+      tags: [Transport]
+      summary: Driver directory for assignment (case_manager/admin only, Screen 46)
+      responses:
+        "200": { description: OK. }
+
+  /interpreters:
+    get:
+      operationId: getInterpreters
+      tags: [Transport]
+      summary: Interpreter directory for assignment (case_manager/admin only, Screen 46)
+      responses:
+        "200": { description: OK. }
 
   /drivers/me/trips:
     get:

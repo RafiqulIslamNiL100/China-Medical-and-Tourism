@@ -21,6 +21,13 @@ export class HospitalsController {
     return this.hospitalsService.search(query);
   }
 
+  // Declared before ":hospitalId" so the literal segment isn't captured as an id.
+  @Get("mine")
+  @Roles(UserRole.hospital_staff)
+  getMine(@CurrentUser() user: AuthenticatedUser) {
+    return this.hospitalsService.getMine(user.userId);
+  }
+
   @Public()
   @Get(":hospitalId")
   getById(@Param("hospitalId") hospitalId: string) {

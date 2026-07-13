@@ -40,6 +40,17 @@ export class TransportController {
     return this.transportService.completeTransfer(user, transferId);
   }
 
+  // Directory endpoints for the ops assignment board (Screen 46).
+  @Get("drivers")
+  listDrivers(@CurrentUser() user: AuthenticatedUser) {
+    return this.transportService.listDrivers(user);
+  }
+
+  @Get("interpreters")
+  listInterpreters(@CurrentUser() user: AuthenticatedUser) {
+    return this.transportService.listInterpreters(user);
+  }
+
   @Get("drivers/me/trips")
   listMyTrips(@CurrentUser() user: AuthenticatedUser, @Query("status") status?: "Assigned" | "Completed") {
     return this.transportService.listMyTrips(user, status);

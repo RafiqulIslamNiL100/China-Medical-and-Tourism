@@ -168,6 +168,16 @@ export class TransportService {
     });
   }
 
+  async listDrivers(user: AuthenticatedUser) {
+    this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
+    return this.prisma.driver.findMany({ orderBy: { fullName: "asc" } });
+  }
+
+  async listInterpreters(user: AuthenticatedUser) {
+    this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
+    return this.prisma.interpreter.findMany({ orderBy: { fullName: "asc" } });
+  }
+
   // --- internal helpers -----------------------------------------------------------
 
   private async notifyPatient(applicationId: string, title: string, body: string) {

@@ -16,9 +16,14 @@ export class HotelsService {
   async search(query: SearchHotelsQuery) {
     if (query.nearHospitalId) {
       const hospital = await this.prisma.hospital.findUnique({ where: { id: query.nearHospitalId } });
-      if (hospital) return this.prisma.hotel.findMany({ where: { citySlug: hospital.citySlug } });
+      if (hospital) {
+        return this.prisma.hotel.findMany({ where: { citySlug: hospital.citySlug }, include: { roomTypes: true } });
+      }
     }
-    return this.prisma.hotel.findMany({ where: query.city ? { citySlug: query.city } : undefined });
+    return this.prisma.hotel.findMany({
+      where: query.city ? { citySlug: query.city } : undefined,
+      include: { roomTypes: true },
+    });
   }
 
   async listRoomTypes(hotelId: string) {
@@ -33,6 +38,27 @@ export class HotelsService {
   async listBookings(hotelId: string, partnerUserId: string) {
     await this.requireOwnHotel(hotelId, partnerUserId);
     return this.prisma.hotelBooking.findMany({ where: { hotelId }, orderBy: { checkIn: "asc" } });
+  }
+
+  /** The partner's own hotels with room types — the Hotel Partner portal's context. */
+  async getMyHotels(partnerUserId: string) {
+    const partner = await this.prisma.hotelPartner.findUnique({
+      where: { userId: partnerUserId },
+      include: { hotels: { include: { roomTypes: true } } },
+    });
+    if (!partner) throw AppException.forbidden();
+    return partner.hotels;
+  }
+
+  /** The patient's own bookings (those linked to their cases) — Screen 15. */
+  async listMyBookings(userId: string) {
+    const patient = await this.prisma.patient.findUnique({ where: { userId } });
+    if (!patient) throw AppException.notFound("PATIENT_PROFILE_NOT_FOUND", "Patient profile not found.");
+    return this.prisma.hotelBooking.findMany({
+      where: { deletedAt: null, application: { patientId: patient.id } },
+      include: { hotel: { select: { name: true, citySlug: true } }, roomType: { select: { name: true } } },
+      orderBy: { checkIn: "desc" },
+    });
   }
 
   async requestBooking(hotelId: string, userId: string, dto: CreateHotelBookingDto) {

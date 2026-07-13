@@ -1,5 +1,10 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { currentPatient, patientNotifications } from "@/data/patient";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-client";
+import { listNotifications, getMyPatientProfile } from "@/lib/api";
 
 const mobileNavItems = [
   { href: "/app/dashboard", label: "Home" },
@@ -13,7 +18,33 @@ const mobileNavItems = [
 ];
 
 export function PortalTopBar() {
-  const unreadCount = patientNotifications.filter((n) => !n.read).length;
+  const router = useRouter();
+  const { accessToken, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [initials, setInitials] = useState("··");
+
+  useEffect(() => {
+    if (!accessToken) return;
+    listNotifications(accessToken, true)
+      .then((res) => setUnreadCount(res.data.length))
+      .catch(() => setUnreadCount(0));
+    getMyPatientProfile(accessToken)
+      .then((profile) =>
+        setInitials(
+          profile.fullName
+            .split(" ")
+            .map((n) => n[0])
+            .slice(0, 2)
+            .join(""),
+        ),
+      )
+      .catch(() => setInitials("?"));
+  }, [accessToken]);
+
+  function handleLogout() {
+    logout();
+    router.push("/login");
+  }
 
   return (
     <div className="sticky top-0 z-30 border-b border-neutral-300/70 bg-white/95 backdrop-blur">
@@ -23,10 +54,8 @@ export function PortalTopBar() {
             CMT
           </span>
         </Link>
-        <span className="hidden rounded-full bg-warning-100 px-2.5 py-1 text-xs font-semibold text-warning-600 lg:inline-block">
-          Demo mode — sample data, no real account
-        </span>
-        <div className="flex items-center gap-4">
+        <span className="hidden lg:inline-block" />
+        <div className="flex items-center gap-3">
           <Link
             href="/app/notifications"
             className="relative rounded-md p-2 text-neutral-700 hover:bg-neutral-100"
@@ -57,11 +86,14 @@ export function PortalTopBar() {
             href="/app/settings"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-700"
           >
-            {currentPatient.name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
+            {initials}
           </Link>
+          <button
+            onClick={handleLogout}
+            className="rounded-md px-2 py-1.5 text-sm font-semibold text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+          >
+            Log out
+          </button>
         </div>
       </div>
       <nav className="flex gap-1 overflow-x-auto border-t border-neutral-300/70 px-3 py-2 lg:hidden">

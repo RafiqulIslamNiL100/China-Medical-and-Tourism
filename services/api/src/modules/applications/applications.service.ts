@@ -115,7 +115,14 @@ export class ApplicationsService {
 
   async getById(user: AuthenticatedUser, applicationId: string) {
     const application = await this.findScoped(user, applicationId);
-    return application;
+    // Screen 12/45: the case timeline. History is append-only and visible to every
+    // role that can see the case at all.
+    const statusHistory = await this.prisma.caseStatusHistory.findMany({
+      where: { applicationId: application.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, status: true, note: true, createdAt: true },
+    });
+    return { ...application, statusHistory };
   }
 
   async decide(user: AuthenticatedUser, applicationId: string, dto: ApplicationDecisionDto) {
