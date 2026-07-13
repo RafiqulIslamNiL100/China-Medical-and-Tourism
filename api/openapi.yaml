@@ -1578,7 +1578,15 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: "#/components/schemas/TransferRequest" }
+                items:
+                  allOf:
+                    - { $ref: "#/components/schemas/TransferRequest" }
+                    - type: object
+                      description: "Denormalized case context not present on the base TransferRequest, since drivers can't call GET /applications/{id} directly."
+                      properties:
+                        refNumber: { type: string }
+                        patientName: { type: string, nullable: true }
+                        patientPhone: { type: string, nullable: true }
 
   /applications/{applicationId}/interpreter-sessions:
     parameters:
@@ -1660,7 +1668,15 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: "#/components/schemas/InterpreterAssignment" }
+                items:
+                  allOf:
+                    - { $ref: "#/components/schemas/InterpreterAssignment" }
+                    - type: object
+                      description: "Denormalized case context not present on the base InterpreterAssignment, since interpreters can't call GET /applications/{id} directly."
+                      properties:
+                        refNumber: { type: string }
+                        patientName: { type: string, nullable: true }
+                        hospitalName: { type: string, nullable: true }
 
   # -------------------------------------------------------------------------
   # Payments — FR-PAY-01 through FR-PAY-06

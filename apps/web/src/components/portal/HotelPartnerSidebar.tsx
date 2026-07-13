@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { currentHotelPartner } from "@/data/partner";
+import { useAuth } from "@/lib/auth-client";
+import { getMyHotels } from "@/lib/api";
 
 const navItems = [
   { href: "/partner/hotel/dashboard", label: "Dashboard" },
@@ -12,6 +14,13 @@ const navItems = [
 
 export function HotelPartnerSidebar() {
   const pathname = usePathname();
+  const { accessToken } = useAuth();
+  const [hotelName, setHotelName] = useState("");
+
+  useEffect(() => {
+    if (!accessToken) return;
+    getMyHotels(accessToken).then((hotels) => setHotelName(hotels[0]?.name ?? ""));
+  }, [accessToken]);
 
   return (
     <aside className="hidden w-60 shrink-0 border-r border-neutral-300/70 bg-white lg:block">
@@ -22,7 +31,7 @@ export function HotelPartnerSidebar() {
           </span>
           Hotel Partner
         </Link>
-        <p className="mb-3 px-2 text-xs text-neutral-500">{currentHotelPartner.hotelName}</p>
+        {hotelName ? <p className="mb-3 px-2 text-xs text-neutral-500">{hotelName}</p> : null}
         {navItems.map((item) => {
           const active = pathname === item.href;
           return (

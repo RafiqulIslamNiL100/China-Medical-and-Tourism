@@ -1,14 +1,33 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/Badge";
-import { hotelBookings } from "@/data/partner";
+import { useAuth } from "@/lib/auth-client";
+import { fmtDate } from "@/lib/portal";
+import { getMyHotels, listHotelBookings, type HotelBooking } from "@/lib/api";
 
-export const metadata: Metadata = { title: "Hotel Dashboard" };
-
-const statusTone = { Pending: "warning", Confirmed: "success", Rejected: "danger" } as const;
+const statusTone = { Pending: "warning", Confirmed: "success", Rejected: "danger", Cancelled: "neutral" } as const;
 
 export default function HotelDashboardPage() {
-  const upcoming = hotelBookings.filter((b) => b.status === "Confirmed").slice(0, 5);
-  const pending = hotelBookings.filter((b) => b.status === "Pending");
+  const { accessToken } = useAuth();
+  const [bookings, setBookings] = useState<HotelBooking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    getMyHotels(accessToken)
+      .then(async (hotels) => {
+        const hotel = hotels[0];
+        if (!hotel) return;
+        setBookings(await listHotelBookings(accessToken, hotel.id));
+      })
+      .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  if (loading) return <p className="text-sm text-neutral-500">Loading…</p>;
+
+  const upcoming = bookings.filter((b) => b.status === "Confirmed").slice(0, 5);
+  const pending = bookings.filter((b) => b.status === "Pending");
 
   return (
     <div className="flex flex-col gap-6">
@@ -30,12 +49,13 @@ export default function HotelDashboardPage() {
               <div>
                 <p className="font-semibold text-neutral-900">{b.guestName}</p>
                 <p className="text-sm text-neutral-500">
-                  {b.roomType} &middot; {b.checkIn} &rarr; {b.checkOut}
+                  {b.roomType?.name ?? "Room"} &middot; {fmtDate(b.checkIn)} &rarr; {fmtDate(b.checkOut)}
                 </p>
               </div>
               <Badge tone={statusTone[b.status]}>{b.status}</Badge>
             </div>
           ))}
+          {upcoming.length === 0 ? <p className="text-sm text-neutral-500">No upcoming check-ins.</p> : null}
         </div>
       </section>
     </div>

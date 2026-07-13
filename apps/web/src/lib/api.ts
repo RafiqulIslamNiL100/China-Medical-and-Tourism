@@ -286,6 +286,12 @@ export type InterpreterSession = {
   status: "Requested" | "Assigned" | "Completed" | "Cancelled";
 };
 
+/** Shape of GET /drivers/me/trips — adds patient/case context not present on the base Transfer. */
+export type MyTrip = Transfer & { refNumber: string; patientName: string | null; patientPhone: string | null };
+
+/** Shape of GET /interpreters/me/appointments — adds patient/case context not present on the base InterpreterSession. */
+export type MyAppointment = InterpreterSession & { refNumber: string; patientName: string | null; hospitalName: string | null };
+
 export type DriverProfile = { id: string; userId: string; fullName: string; phone: string | null };
 export type InterpreterProfile = { id: string; userId: string; fullName: string; languages: string[] };
 
@@ -685,7 +691,7 @@ export function completeTransfer(accessToken: string, transferId: string) {
 }
 
 export function listMyTrips(accessToken: string, status?: "Assigned" | "Completed") {
-  return request<Transfer[]>("/drivers/me/trips", { accessToken, query: { status } });
+  return request<MyTrip[]>("/drivers/me/trips", { accessToken, query: { status } });
 }
 
 export function listInterpreterSessions(accessToken: string, applicationId: string) {
@@ -717,7 +723,7 @@ export function completeInterpreterSession(accessToken: string, sessionId: strin
 }
 
 export function listMyAppointments(accessToken: string) {
-  return request<InterpreterSession[]>("/interpreters/me/appointments", { accessToken });
+  return request<MyAppointment[]>("/interpreters/me/appointments", { accessToken });
 }
 
 export function listDrivers(accessToken: string) {
