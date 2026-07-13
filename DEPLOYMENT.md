@@ -41,9 +41,16 @@ In the same Railway project: **New → GitHub Repo** → select this repo.
 | `JWT_REFRESH_SECRET` | A different long random string |
 | `RESEND_API_KEY` | Your Resend API key (optional — omit it and email just logs server-side instead of sending) |
 | `RESEND_FROM_EMAIL` | e.g. `"China Medical and Tourism <onboarding@resend.dev>"` (optional, has a default) |
+| `CORS_ORIGINS` | Comma-separated list of allowed frontend origins, e.g. `https://your-app.vercel.app` (optional — omit it during setup and the API allows all origins, which is fine short-term but should be locked down before calling this production) |
+| `S3_BUCKET` | Bucket name for persistent document storage (optional — see "Known limitations" below for what happens without it) |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Credentials for the bucket above |
+| `S3_REGION` | Bucket region, e.g. `auto` for Cloudflare R2, `us-east-1` for AWS |
+| `S3_ENDPOINT` | Only needed for non-AWS S3-compatible providers (Cloudflare R2, Railway Buckets, MinIO) — omit for real AWS S3 |
 
 Generate strong secrets with `openssl rand -hex 32` (run locally, don't reuse the repo's
-dev placeholders).
+dev placeholders). All four S3 variables must be set together for `StorageService` to use
+real object storage — set none of them and it falls back to local-disk storage (see
+"Known limitations" below).
 
 Deploy. The container's `CMD` runs `prisma migrate deploy` automatically before starting
 the server, so the database schema is created on first boot — no manual migration step.
@@ -80,19 +87,28 @@ vars change, but trigger a manual redeploy from the dashboard if it doesn't).
 
 ## Known limitations once deployed
 
-These are documented adapters (see `docs/PROJECT_CONTEXT.md` §17), not deployment bugs —
-worth knowing about before treating the live site as production-ready:
+These are documented adapters (see `docs/PROJECT_CONTEXT.md` §17–18), not deployment
+bugs — worth knowing about before treating the live site as fully production-ready:
 
-- **Uploaded documents don't persist.** `StorageService` writes to local disk
-  (`.data/documents/`) inside the container. Most PaaS containers are ephemeral —
-  anything written to disk is lost on the next deploy or restart. Fine for a demo,
-  not for real patient documents. Fixing this means swapping `StorageService` for a
-  real S3-compatible client (the interface is already isolated to one file).
+- **Uploaded documents don't persist unless `S3_*` env vars are set.** Without them,
+  `StorageService` writes to local disk (`.data/documents/`) inside the container. Most
+  PaaS containers are ephemeral — anything written to disk is lost on the next deploy or
+  restart. The code already supports real S3-compatible storage (AWS S3, Cloudflare R2,
+  Railway Buckets, MinIO) — set the four `S3_*` variables above and it activates
+  automatically, no code changes needed.
 - **Payments are mocked.** `MockPaymentProcessor` never touches a real payment
   network — every token except the literal string `"tok_decline"` "succeeds." No real
   money moves. Swapping in Stripe (or similar) means implementing the same
-  `charge()` interface against their SDK.
-- **Only a vertical slice of the frontend is wired to the real API** — auth, hospital
-  directory, and the patient apply/cases flow. Every other screen (hospital staff
-  portal, ops console, admin console, partner portals, and most of the patient
-  portal) still reads static mock data until it's wired the same way.
+  `charge()` interface against their SDK — this has not been started, since it requires
+  a real Stripe account this environment doesn't have.
+- **Demo account passwords are public.** Every seeded account shares the password
+  `Passw0rd!23`, documented in this repo. Before treating a production database as real,
+  run `database/prisma/rotate-demo-passwords.js` (see its header comment) to set a real,
+  private password, or delete the demo accounts entirely.
+- **`CORS_ORIGINS` should be set explicitly in production.** Leaving it unset allows
+  all origins, which is fine for initial setup but not for a long-lived production
+  deployment — set it to your exact frontend domain(s) once the site is stable.
+
+All six portals — patient, hospital staff, operations, admin, and the three partner
+roles — are now wired to the real API end to end (see `docs/PROJECT_CONTEXT.md` §14).
+There is no remaining mock-data screen in `apps/web`.

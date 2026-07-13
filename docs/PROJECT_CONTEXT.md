@@ -209,11 +209,11 @@ product each time.
 | Phase 2 — UI/UX Design | ✅ Complete (54 screens specified + visual token reference) |
 | Phase 3 — System Architecture | ✅ Complete (9 docs: overview/diagrams, frontend, backend/API, database, auth/security, storage/caching/search, notifications, observability, deployment/CI-CD) |
 | Phase 4 — Folder Structure | ✅ Complete — `apps/web` (frontend, §14), `database/` (Prisma schema + migrations + seed, §15), and `services/api` (NestJS backend, §17) all scaffolded as npm workspaces |
-| Phase 5 — Module-by-module build | Frontend: all 59 screens from Phase 2 are built and navigable in `apps/web` across all 6 portals. Backend: all 12 modules from the OpenAPI spec are implemented with real persistence in `services/api` (see §17). Frontend↔backend wiring: auth, hospital directory, and the patient application flow are wired to the real API as a demonstrated vertical slice; the remaining screens still run on the mock data described in §14 (see §17 for the exact list) |
-| Phase 6 — Database Design | ✅ Complete and **applied** — 40+ model Prisma schema (`database/prisma/schema.prisma`), 4 migrations run against a real local Postgres 16 instance, seed script loads realistic demo data (see §15) |
-| Phase 7 — API Specification | ✅ Complete and **implemented** — 84-operation OpenAPI 3.0 spec (`api/openapi.yaml`, lint-validated); every operation is now backed by real NestJS controller/service code (see §17) |
-| Phase 8 — Testing | No automated test suite yet. Every module was smoke-tested end-to-end via curl/Playwright against the real running API + database during implementation (see §17), but there is no repeatable `npm test` — this is the next real gap |
-| Phase 9 — Deployment | Not started for the backend (`services/api` has no Dockerfile/CI/hosting config yet). The frontend has been manually deployed to Vercel by the user outside this workflow |
+| Phase 5 — Module-by-module build | ✅ Complete — all 59 screens from Phase 2 are built, navigable, and **wired to the real API** in `apps/web` across all 6 portals (patient, hospital staff, ops, admin, and the three partner roles). No screen still reads static mock data (see §14). Backend: all 12 modules from the OpenAPI spec are implemented with real persistence in `services/api`, plus a handful of cross-portal support endpoints the frontend wiring uncovered a need for (see §17) |
+| Phase 6 — Database Design | ✅ Complete and **applied** — 40+ model Prisma schema (`database/prisma/schema.prisma`), migrations run against a real local Postgres 16 instance, seed script loads realistic demo data (see §15) |
+| Phase 7 — API Specification | ✅ Complete and **implemented** — 90+-operation OpenAPI 3.0 spec (`api/openapi.yaml`, lint-validated); every operation is backed by real NestJS controller/service code (see §17) |
+| Phase 8 — Testing | A lightweight, zero-dependency end-to-end smoke test (`services/api/test/smoke.mjs`, run via `npm test`) exercises the real HTTP API — register→OTP→verify→login→hospitals→apply→list — and runs in CI (see §17). Still no unit/integration test suite for business logic — the next real gap |
+| Phase 9 — Deployment | Backend has a production `Dockerfile`, a `/health` endpoint, and has been manually deployed to Railway by the user, following `DEPLOYMENT.md`. Frontend is deployed to Vercel and points at the live backend. GitHub Actions CI (`.github/workflows/ci.yml`) runs on every push (see §17–18) |
 
 ## 14. Current Implementation — `apps/web`
 
@@ -265,46 +265,69 @@ route groups so each surface gets the right chrome:
   the design spec's emphasis on one-handed, on-the-go use for those roles.
 
 All six surfaces use the exact color/type tokens from
-`docs/02-ui-ux-design/01-style-guide.md`. Most screens still read from the typed
-mock-data layers (`apps/web/src/data/hospitals.ts`, `apps/web/src/data/patient.ts`,
+`docs/02-ui-ux-design/01-style-guide.md`. The typed mock-data layers
+(`apps/web/src/data/hospitals.ts`, `apps/web/src/data/patient.ts`,
 `apps/web/src/data/hospitalStaff.ts`, `apps/web/src/data/opsConsole.ts`,
-`apps/web/src/data/admin.ts`, `apps/web/src/data/partner.ts`); a specific subset (below)
-now reads from the real backend instead.
+`apps/web/src/data/admin.ts`, `apps/web/src/data/partner.ts`) still exist in the repo
+(some components — e.g. the `cities`/`hospitals` static lists used for dropdown seed
+data — still reference small non-account-specific parts of them), but no screen renders
+account-specific data from them anymore; every screen fetches from the real API.
 
-**What this is:** a real, buildable, navigable product demonstrating the design system
-and full information architecture end to end — the public site, a patient's day-to-day
-experience, a hospital staff member's application-review workflow, internal
-case-manager operations, platform administration, and every partner role's task
-surface. Every one of the 59 screens specified in Phase 2 exists and renders correctly.
+**What this is:** a real, buildable, navigable, end-to-end product — the public site, a
+patient's day-to-day experience, a hospital staff member's application-review workflow,
+internal case-manager operations, platform administration, and every partner role's
+task surface, all backed by the real database through the real API. Every one of the 59
+screens specified in Phase 2 exists, renders correctly, and reads/writes real data.
 
-**Wired to the real backend (`services/api`, §17), as of this update:**
-- `src/lib/api.ts` — a typed fetch client for the real API, and `src/lib/auth-client.tsx`
-  — a client-side `AuthProvider`/`useAuth()` React context that stores the JWT access/
-  refresh token pair in `localStorage` (a pragmatic simplification for this vertical
-  slice — a production build would use httpOnly cookies) and exposes `login`,
-  `register`, `verifyEmail`, `logout`.
-- `/login` and `/register` (with an inline OTP-verification step) call the real
-  `/auth/*` endpoints and store real tokens on success.
-- `/hospitals` and `/hospitals/[slug]` are server components that fetch the real,
-  seeded hospital/doctor/package/review data from `GET /hospitals`,
-  `GET /hospitals/{id}/{doctors,packages,reviews}` — no more static hospital list.
-- The Patient Portal's `/app/apply` wizard (`ApplicationWizard.tsx`) fetches real,
-  specialty-filtered hospitals for its dropdown and submits via a real
-  `POST /applications` call using the logged-in patient's access token.
-- `/app/cases` (My Applications) is a client component that calls the real
-  `GET /applications` and renders the logged-in patient's actual cases, correctly
-  split across the Active/Completed/Declined tabs.
-- All of the above was verified with a real Playwright browser session against the
-  seeded `amara.nwosu@example.com` account (see §17) — not just a build check.
+**Wired to the real backend (`services/api`, §17):**
+- `src/lib/api.ts` — a single typed fetch client covering every operation in
+  `api/openapi.yaml` (~70 exported functions), and `src/lib/auth-client.tsx` — a
+  client-side `AuthProvider`/`useAuth()` React context that stores the JWT access/
+  refresh token pair in `localStorage` (a pragmatic simplification — a production build
+  would use httpOnly cookies) and exposes `login`, `register`, `verifyEmail`, `logout`.
+- `src/lib/portal.tsx` — shared portal helpers: `RequireRole` (client-side route guard,
+  redirects anonymous visitors to `/login` and shows a clear message on a role
+  mismatch — the real security boundary is still enforced server-side per request),
+  plus `fmtDate`/`fmtDateTime`/`fmtMoney`/`statusLabel`/`slaRiskFor`.
+- **Public site** — `/login`, `/register` (with inline OTP verification), `/hospitals`,
+  `/hospitals/[slug]` all call the real `/auth/*` and `/hospitals/*` endpoints.
+- **Patient Portal (`/app/*`)** — dashboard, application wizard, case list, case detail
+  (documents upload/download, messages, invoices/pay, real itinerary from hotel
+  bookings + transfers), dependents, hotel and transfer booking, payments, reviews,
+  notifications (with mark-read), and settings (profile + notification preferences) all
+  call the real API.
+- **Hospital Portal (`/hospital/*`)** — dashboard, applications queue, application
+  detail (real Accept/RequestInfo/Decline decisions with treatment plan and cost
+  estimate), doctors and packages (list + add), profile (submits a moderation change
+  request, doesn't apply instantly — matches the real BR-03 approval workflow), and
+  reports.
+- **Ops Console (`/ops/*`)** — case queue (My Cases/Urgent/Unassigned/All, via the
+  `view` query param), case detail (internal notes, reassign to another case manager,
+  per-case driver/interpreter assignment), and a cross-case assignment board.
+- **Admin Console (`/admin/*`)** — platform dashboard (real KPIs + top-rated
+  hospitals), users & roles (invite, activate/deactivate), hospital listing moderation
+  (approve/reject), review moderation (approve/redact/reject), finance (commission
+  rates + transaction ledger), CMS (all articles including drafts, publish/unpublish),
+  audit log (with CSV export), and platform settings (key/value editor over the real
+  `PlatformSetting` table).
+- **Partner Portals (`/partner/*`)** — Hotel Partner (dashboard, inventory & rates,
+  bookings with confirm/reject), Driver "My Trips" (assigned transfers with
+  mark-complete and call-patient), Interpreter "My Appointments" (assigned hospital
+  visits with mark-complete). All three now have a `RequireRole` gate, which they
+  didn't before.
+- Verified end to end: `npx tsc --noEmit` and `npx next build` both pass clean for the
+  whole app; the backend endpoints these screens depend on were exercised directly
+  (curl, against a locally running server with real seeded accounts for every role) as
+  each portal was wired, not just build-checked.
 
-**Still on mock data — deliberately out of scope for this pass:** every other screen
-across all six portals (hospital staff, ops console, admin console, all three partner
-portals, and the rest of the patient portal — dependents, documents, messages,
-itinerary, payments, notifications, reviews). This was an explicit scoping decision
-("a demonstrated vertical slice," not "wire all 59 screens") — the backend already
-implements every one of these screens' endpoints (§17), so wiring the remaining screens
-is now a mechanical repeat of the same pattern (`src/lib/api.ts` call + real
-`accessToken` from `useAuth()`), not new backend work.
+**Cross-portal backend endpoints added while wiring the frontend** (i.e., gaps the
+Phase 7 spec didn't anticipate until a real screen needed them — see §17 for the full
+list): `GET /hospitals/mine`, `GET /hotels/mine`, `GET /hotel-bookings/me`,
+`GET /drivers`, `GET /interpreters`, `GET /applications/case-managers`,
+`GET /assignment-board`, `GET /admin/articles`, plus `patientName`/`patientCountry` on
+`GET /applications/{id}` and denormalized patient/hospital context on
+`GET /drivers/me/trips` and `GET /interpreters/me/appointments` (both roles can't call
+`GET /applications/{id}` directly, so the case context is pre-joined server-side).
 
 Run locally: `cd apps/web && npm install && npm run dev` (also start `services/api`,
 see §17, and set `NEXT_PUBLIC_API_BASE_URL` per `apps/web/.env.example`).
@@ -342,11 +365,13 @@ wired up. All demo accounts share the password `Passw0rd!23`; the script is idem
 ## 16. API Specification — `api/`
 
 Phase 7 (API Specification) is complete: `api/openapi.yaml` is a full OpenAPI 3.0.3
-document — 84 operations across the 12 modules from §5b/§15, request/response schemas
-mirroring the Prisma models, and every operation traced back to the `FR-*`/`BR-*`/
-Screen it implements. Lint-validated with Redocly (`npx @redocly/cli lint
-api/openapi.yaml`) — 0 errors; the 65 remaining warnings are documented, deliberate
-non-fixes (see `docs/07-api-specification/01-api-overview.md` §4), not oversights.
+document — 90+ operations across the 12 modules from §5b/§15 (the original 84 plus a
+handful of cross-portal support endpoints added during frontend wiring, see §14/§17),
+request/response schemas mirroring the Prisma models, and every operation traced back
+to the `FR-*`/`BR-*`/Screen it implements. Lint-validated with Redocly
+(`npx @redocly/cli lint api/openapi.yaml`) — 0 errors; the 73 remaining warnings are
+documented, deliberate non-fixes (see `docs/07-api-specification/01-api-overview.md`
+§4), not oversights.
 
 - Overview, conventions, and explicitly-flagged design decisions:
   `docs/07-api-specification/01-api-overview.md`
@@ -399,46 +424,147 @@ Payments, Reviews, Notifications, CMS, Admin.
   `INSERT`s; there is deliberately no update/delete method, matching that no
   write/delete endpoint for it exists in the OpenAPI spec.
 
-**Real adapters standing in for infrastructure this sandbox doesn't have credentials
-for** — each is a single small class behind the interface the rest of the code calls,
-documented in-code as swappable for the real thing without touching any caller:
-- `StorageService` — saves uploaded files to local disk (`.data/documents/`) instead of
-  S3; `resolveDownloadUrl()` returns an API path instead of a signed URL.
-- `NotificationService` — always writes the real, queryable in-app `Notification` row
-  (this part is not mocked), and console-logs an "email" instead of calling
-  Resend/Twilio. Now also checks `NotificationPreference` before sending (FR-NOTIF-04),
-  defaulting to enabled when no preference row exists.
-- `MockPaymentProcessor` — the token `"tok_decline"` is a documented test hook that
-  simulates a processor decline (exercising the real `402` path); any other token
-  "succeeds." No real card data ever flows through this — the spec's
-  `paymentMethodToken` field is designed to only ever carry an opaque tokenized
-  reference from a real client-side SDK in production.
-- Payment receipts (`GET /invoices/{id}/receipt`) are served as plain text, not PDF —
-  no PDF-rendering library is available in this environment. The response is honestly
-  labeled as a development placeholder rather than mislabeled as `application/pdf`.
+**Security hardening (production-grade, not deferred):**
+- `helmet()` on every response, `app.set("trust proxy", 1)` for correct client IPs
+  behind a PaaS reverse proxy.
+- `@nestjs/throttler` — global rate limit (100 req/min per IP) via `APP_GUARD`, plus a
+  stricter override on `/auth/*` (10 req/min) since those are the highest-value targets
+  for brute-force/credential-stuffing.
+- CORS allowlist via the `CORS_ORIGINS` env var (comma-separated exact origins);
+  defaults to allow-all only when unset, so local dev isn't broken by default but
+  production deploys are expected to lock it down (see `DEPLOYMENT.md`).
+- Demo account passwords now come from `SEED_DEMO_PASSWORD` (falls back to the
+  documented `Passw0rd!23` default) — `database/prisma/rotate-demo-passwords.js` is a
+  standalone script to re-hash all demo passwords and revoke their sessions in one
+  transaction, for use before treating any deployed database as real.
 
-**Known, accepted gaps:**
-- No automated test suite (`npm test`) — verification so far is thorough manual/curl/
-  Playwright smoke testing across every module (documented per-module above), not a
-  repeatable CI-gated suite.
-- `npm audit` on `services/api` shows 24 vulnerabilities, all in dev-only build tooling
-  (`@nestjs/cli`'s transitive deps — webpack, inquirer, tmp), not runtime dependencies;
-  fixing requires a `@nestjs/cli` v10→v11 major bump, deliberately deferred rather than
-  done reflexively.
-- No CI pipeline yet. A production `Dockerfile` (`services/api/Dockerfile`) and a real
-  `GET /health` endpoint (`{status, timestamp}`, checks DB connectivity, excluded from
-  the `/v1` prefix so it matches most hosts' default health-check path) now exist and
-  were verified locally by running the exact commands the container runs — `npm run
-  build --workspace=services/api`, `prisma migrate deploy` (confirmed idempotent), and
-  `node services/api/dist/main.js` from the repo root — but the image itself has not
-  been Docker-built or deployed anywhere (no Docker daemon in this sandbox). See
-  `DEPLOYMENT.md` at the repo root for the actual deploy steps (Railway or equivalent)
-  and the honest list of what's still mocked once it's live (ephemeral local-disk
-  storage, mock payment processor).
-- Frontend wiring is a deliberately scoped vertical slice (auth + hospitals +
-  application flow), not all 59 screens — see §14 for the exact list of what's wired
-  versus still on mock data.
+**Real adapters, credential-gated (not mocked when configured):**
+- `EmailService` — real transactional email via Resend (`resend` npm package) when
+  `RESEND_API_KEY` is set; falls back to the original console-log behavior when it
+  isn't, so nothing breaks if the key is absent. `NotificationService` resolves the
+  recipient's real email from the `User` table before sending.
+- `StorageService` — S3-compatible storage (AWS SDK v3, `@aws-sdk/client-s3` +
+  `s3-request-presigner`) when all four `S3_*` env vars are set (works with AWS S3,
+  Cloudflare R2, Railway Buckets, or MinIO via `S3_ENDPOINT`), including presigned
+  15-minute download URLs; falls back to the original local-disk adapter when unset.
+  Neither this repo nor this environment has real S3/R2 credentials, so this remains
+  unexercised against a real bucket — the code path is written and build-verified, not
+  live-verified.
+- `MockPaymentProcessor` — unchanged from Phase 5; still the only payment path (no
+  Stripe account exists to integrate against). The token `"tok_decline"` is a
+  documented test hook that simulates a processor decline (exercising the real `402`
+  path); any other token "succeeds." No real card data ever flows through this — the
+  spec's `paymentMethodToken` field is designed to only ever carry an opaque tokenized
+  reference from a real client-side SDK in production.
+- Payment receipts (`GET /invoices/{id}/receipt`) are still served as plain text, not
+  PDF — no PDF-rendering library is available in this environment. The response is
+  honestly labeled as a development placeholder rather than mislabeled as
+  `application/pdf`.
+
+**Testing & CI:**
+- `services/api/test/smoke.mjs` — a zero-dependency (no test framework) end-to-end
+  smoke test. Spawns the built server against a real Postgres, polls `/health`, then
+  drives register→OTP(captured from the email dispatch log)→verify→`/me`→bad-login-401→
+  hospitals→create-application→list-applications, cleaning up what it created. Run via
+  `npm test` from `services/api`. 9/9 checks pass.
+- `.github/workflows/ci.yml` — two jobs on every push/PR: `web` (typecheck + build for
+  `apps/web`) and `api` (spins up a real Postgres 16 service container, runs
+  `prisma migrate deploy`, seeds, builds, and runs the smoke test above for
+  `services/api`).
+- Still no unit/integration test suite for individual business-logic functions — the
+  smoke test is a real but shallow end-to-end check, not a substitute for one. This
+  remains the most significant testing gap.
+- `npm audit` on `services/api` shows vulnerabilities confined to dev-only build
+  tooling (`@nestjs/cli`'s transitive deps — webpack, inquirer, tmp), not runtime
+  dependencies; fixing requires a `@nestjs/cli` v10→v11 major bump, deliberately
+  deferred rather than done reflexively.
+
+**Deployment:** a production `Dockerfile` (`services/api/Dockerfile`, multi-stage,
+workspace-aware) and `GET /health` (`{status, timestamp}`, checks DB connectivity,
+excluded from the `/v1` prefix) exist and have been used for a real deployment — the
+user deployed `services/api` to Railway and `apps/web` to Vercel following
+`DEPLOYMENT.md`, confirmed via a live `/health` check and a real login attempt against
+the deployed backend. See `DEPLOYMENT.md` for the exact steps and the honest list of
+what's still gated on missing credentials (S3/R2 bucket, Stripe account).
+
+**Cross-portal endpoints added during frontend wiring** (Phase 5, once every screen —
+not just the original vertical slice — needed real data; see §14 for which screens use
+each):
+- `GET /hospitals/mine`, `GET /hotels/mine`, `GET /hotel-bookings/me` — "my own X"
+  endpoints for hospital staff, hotel partners, and patients respectively, scoped
+  server-side to the caller's own hospital/hotel/account (route-ordering note: each was
+  registered before its sibling `:id` route so the literal `mine`/`me` segment isn't
+  captured as a path parameter).
+- `GET /drivers`, `GET /interpreters` — directory endpoints (case_manager/admin only)
+  for the ops assignment board and reassign pickers.
+- `GET /applications/case-managers` — active case-manager directory for the ops
+  console's reassign picker (case_manager/admin only).
+- `GET /assignment-board` — all open transfers and interpreter sessions across every
+  case (not just one), for the ops console's cross-case assignment board
+  (case_manager/admin only).
+- `GET /admin/articles` — all CMS articles including drafts (admin only); the existing
+  public `GET /articles` intentionally excludes drafts, so the admin CMS console needed
+  its own listing.
+- `GET /applications/{id}` now also returns `patientName`/`patientCountry` (resolved
+  from the patient or dependent record) — hospital staff and case managers reviewing a
+  case need to know who they're reviewing, which the bare `Application` record (only a
+  `patientId`) didn't expose.
+- `GET /drivers/me/trips` and `GET /interpreters/me/appointments` now return
+  denormalized `refNumber`/`patientName`/(`patientPhone`|`hospitalName`) per record —
+  drivers and interpreters aren't authorized to call `GET /applications/{id}` directly
+  (that endpoint is scoped to patient/hospital_staff/case_manager/admin), so the case
+  context they need for their own assigned work is pre-joined server-side instead.
+- `GET /hotels` (search) now includes each hotel's `roomTypes` in the response, so the
+  patient booking flow can show room options without an extra round trip per hotel.
 
 Run locally: `cd database && npm run seed` (after `npm run migrate:dev` — see
 `database/README.md`), then `cd services/api && npm install && npm run start:dev`. The
 API listens on `http://localhost:3001/v1`.
+
+## 18. Production Readiness Checklist
+
+Everything below is either done, or the exact remaining step and why it hasn't been
+done in this environment — not a vague "needs more work."
+
+**Done:**
+- [x] All 59 screens across all 6 portals wired to the real API (§14).
+- [x] Real authentication (argon2, JWT, refresh rotation, OTP email verification).
+- [x] Real authorization (role guards + service-layer row-level scoping, not just UI).
+- [x] Rate limiting, CORS allowlist, helmet security headers.
+- [x] Real transactional email via Resend (credential-gated, degrades gracefully).
+- [x] Real S3-compatible storage adapter written and build-verified (credential-gated).
+- [x] Append-only audit log for sensitive actions.
+- [x] Idempotent payment/refund endpoints (`Idempotency-Key` header).
+- [x] Production Dockerfile, `/health` endpoint, and a real deployment (Railway +
+      Vercel) that the user has verified live.
+- [x] End-to-end smoke test + GitHub Actions CI on every push.
+- [x] Demo-password rotation script, ready to run against a production database.
+
+**Requires a real credential this environment cannot obtain — code is ready, activation
+is a config change, not a rewrite:**
+- [ ] **Real payment processing.** Needs a live Stripe (or equivalent) account.
+      `MockPaymentProcessor` implements the same interface a real one would — swapping
+      it in means implementing `charge()`/`refund()` against the real SDK and setting
+      the resulting API keys as env vars, not restructuring the payments module.
+- [ ] **Persistent file storage.** Needs a real S3/R2/MinIO bucket + access keys.
+      `StorageService` already supports this — set the four `S3_*` env vars documented
+      in `DEPLOYMENT.md` and it activates with no code changes.
+
+**Operational steps for whoever runs the production deployment (not code changes):**
+- [ ] Run `database/prisma/rotate-demo-passwords.js` against the production database,
+      or delete the seeded demo accounts, before treating it as holding real patient
+      data.
+- [ ] Set `CORS_ORIGINS` on the production backend to the exact frontend domain(s)
+      once the deployment is stable (left unset = allow-all, fine for initial setup
+      only).
+- [ ] Rotate `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` to values generated with
+      `openssl rand -hex 32` if the deployment ever used the repo's dev placeholders.
+- [ ] Decide on a real PDF-generation approach for payment receipts (currently plain
+      text) if that's a real product requirement, not just a demo gap.
+
+**Deliberately out of scope for this project as an AI-built demonstration, regardless
+of environment:**
+- A real business entity, medical-licensing compliance review, and legal review of the
+  privacy policy / terms of service (both are explicitly marked draft — see §4).
+- SMS/OTP via a real provider (Twilio or similar) — email OTP is fully real; SMS was
+  never implemented, only specified in the architecture docs (§5).
