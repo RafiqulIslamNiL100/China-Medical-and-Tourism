@@ -121,20 +121,23 @@ clarity over decoration, evidence over adjectives, one primary action per screen
 
 ## 8. API Conventions
 
-*(Fixed in Phase 3, see `docs/03-architecture/03-backend-api-architecture.md`; a full
-endpoint-by-endpoint specification is still produced in Phase 7.)*
+*(Fixed conceptually in Phase 3, see `docs/03-architecture/03-backend-api-architecture.md`;
+implemented as a full, linter-validated OpenAPI 3.0 spec in Phase 7 — see §16.)*
 
-- REST, JSON, versioned under `/api/v1/`.
+- REST, JSON, versioned under `/v1` (served from an `api.` subdomain in the spec's
+  illustrative production server — revise if the eventual real deployment uses a
+  path prefix like `/api/v1` on a shared domain instead).
 - Authenticated routes require a bearer JWT; role scope enforced per endpoint, plus
   tenant-scoping for `hospital_staff`/`hotel_partner`/`driver`/`interpreter` roles.
-- Resource naming: plural nouns (`/patients`, `/cases`, `/hospitals`), nested where
-  ownership is clear (`/cases/:id/documents`).
+- Resource naming: plural nouns (`/patients`, `/applications`, `/hospitals`), nested
+  where ownership is clear (`/applications/{id}/documents`).
 - Cursor-based pagination for high-growth lists; consistent `{ error: { code, message,
   details } }` error shape; `Idempotency-Key` header required for endpoints with external
   side effects (payments, invitation letters).
 - Every mutating endpoint on a "case" object emits a notification event per
   FR-APP-08/FR-NOTIF-01, via the internal event bus (never direct provider calls from a
   business module).
+- 84 operations across 12 modules are now fully specified — see §16 for the index.
 
 ## 9. Database Conventions
 
@@ -208,7 +211,7 @@ product each time.
 | Phase 4 — Folder Structure | Partial — `apps/web` scaffolded (see §14) and `database/` added (§15); backend services/packages layout not yet defined |
 | Phase 5 — Module-by-module build | Frontend complete — all 59 screens from Phase 2 are built and navigable in `apps/web` on mock data across all 6 portals; no real backend/auth/database wired up yet (see §14) |
 | Phase 6 — Database Design | ✅ Complete — 40-model Prisma schema (`database/prisma/schema.prisma`, validated), ERD, and field-by-field schema reference with FR-\*/BR-\* traceability (see §15) |
-| Phase 7 — API Specification | Not started (placeholder conventions only, §8) |
+| Phase 7 — API Specification | ✅ Complete — 84-operation OpenAPI 3.0 spec (`api/openapi.yaml`, lint-validated), overview, and endpoint reference (see §16) |
 | Phase 8 — Testing | Not started (no automated tests yet — build/lint pass) |
 | Phase 9 — Deployment | Not started |
 
@@ -307,5 +310,29 @@ Booking, Visa, Hotel, Transport, Payment, CMS, Reviews, Notification, Admin).
 (Prisma 6 — see the note in §9 about Prisma 7's breaking config change), but no
 migration has been run against a real Postgres instance, no Prisma Client has been
 generated into `apps/web`, and nothing in the frontend queries it. That wiring — plus
-the backend services themselves — is Phase 7 (API Specification) and the subsequent
-module-by-module backend implementation.
+the backend services themselves — is the module-by-module backend implementation that
+comes after Phase 7 (§16).
+
+## 16. API Specification — `api/`
+
+Phase 7 (API Specification) is complete: `api/openapi.yaml` is a full OpenAPI 3.0.3
+document — 84 operations across the 12 modules from §5b/§15, request/response schemas
+mirroring the Prisma models, and every operation traced back to the `FR-*`/`BR-*`/
+Screen it implements. Lint-validated with Redocly (`npx @redocly/cli lint
+api/openapi.yaml`) — 0 errors; the 65 remaining warnings are documented, deliberate
+non-fixes (see `docs/07-api-specification/01-api-overview.md` §4), not oversights.
+
+- Overview, conventions, and explicitly-flagged design decisions:
+  `docs/07-api-specification/01-api-overview.md`
+- Full endpoint table by module (auto-generated from the spec, so it can't drift out
+  of sync the way a hand-maintained table would):
+  `docs/07-api-specification/02-endpoint-reference.md`
+- Preview interactively: `npx @redocly/cli preview-docs api/openapi.yaml` from the
+  repo root.
+
+**Specified, not implemented.** No backend code exists that serves any of these
+routes — `apps/web`'s 59 screens still run entirely on the mock data described in §14.
+Implementing this spec (NestJS controllers/services per
+`docs/03-architecture/03-backend-api-architecture.md`, backed by the Phase 6 schema)
+and wiring the frontend to it is the next real milestone, and the largest remaining
+piece of work on the roadmap.

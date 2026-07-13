@@ -1,0 +1,2099 @@
+openapi: 3.0.3
+
+info:
+  title: China Medical and Tourism API
+  version: "1.0.0"
+  description: >
+    REST API for the China Medical and Tourism platform. Implements the conventions
+    fixed in docs/03-architecture/03-backend-api-architecture.md and
+    docs/PROJECT_CONTEXT.md §8: REST/JSON under /api/v1, bearer JWT auth,
+    cursor-based pagination for high-growth lists, a consistent error shape, and
+    Idempotency-Key support on endpoints with external side effects.
+
+    Request/response schemas mirror database/prisma/schema.prisma (Phase 6). Every
+    endpoint below traces to one or more functional requirements from
+    docs/01-product-planning/05-functional-requirements.md (FR-*), referenced in each
+    operation's description.
+
+    This spec covers the endpoints needed to power the 59 screens already built in
+    apps/web (see docs/02-ui-ux-design/) — it is scoped to what those screens need,
+    not a speculative superset.
+
+servers:
+  - url: https://api.cmt-platform.com/v1
+    description: Production (illustrative — no real deployment exists yet)
+  - url: http://localhost:3001/v1
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: Registration, login, session management (FR-AUTH-*)
+  - name: Patients
+    description: Patient profile and dependents (FR-AUTH-06)
+  - name: Hospitals
+    description: Hospital/doctor/package directory and management (FR-HOSP-*)
+  - name: Applications
+    description: Treatment applications ("cases") and messaging (FR-APP-*)
+  - name: Documents
+    description: Visa document checklist and invitation letters (FR-VISA-*)
+  - name: Hotels
+    description: Hotel search, booking, and partner inventory (FR-HOTEL-*)
+  - name: Transport
+    description: Airport transfers and interpreter assignments (FR-XFER-*, FR-INTERP-*)
+  - name: Payments
+    description: Invoices, payments, refunds, commission rates (FR-PAY-*)
+  - name: Reviews
+    description: Patient reviews and moderation (FR-REVIEW-*)
+  - name: Notifications
+    description: In-app notifications and channel preferences (FR-NOTIF-*)
+  - name: CMS
+    description: Blog articles and destination guides (FR-CMS-*)
+  - name: Admin
+    description: User/role management, audit log, platform settings, analytics (FR-OPS-*, FR-ANALYTICS-*)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >
+        Required on endpoints with external side effects (payments, invitation
+        letters) so a retried request can't double-execute, per
+        docs/03-architecture/03-backend-api-architecture.md §3.
+      schema:
+        type: string
+        format: uuid
+    CursorParam:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque pagination cursor from a previous response's nextCursor.
+      schema:
+        type: string
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    ApplicationIdParam:
+      name: applicationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: { code: UNAUTHENTICATED, message: "Missing or invalid access token." }
+    Forbidden:
+      description: >
+        Authenticated but not authorized for this resource (wrong role, or wrong
+        tenant scope per BR-03/BR-04).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: { code: FORBIDDEN, message: "You do not have access to this resource." }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: { code: NOT_FOUND, message: "The requested resource was not found." }
+    ValidationError:
+      description: Request failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: "One or more fields are invalid."
+              details: { field: "email", reason: "must be a valid email address" }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable identifier, e.g. CASE_NOT_FOUND.
+            message:
+              type: string
+            details:
+              type: object
+
+    PaginatedMeta:
+      type: object
+      properties:
+        nextCursor:
+          type: string
+          nullable: true
+        hasMore:
+          type: boolean
+
+    Role:
+      type: string
+      enum: [patient, hospital_staff, doctor, case_manager, driver, interpreter, hotel_partner, admin]
+
+    CaseStatus:
+      type: string
+      enum: [Submitted, UnderReview, InfoRequested, Accepted, Declined, Completed]
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        role: { $ref: "#/components/schemas/Role" }
+        status: { type: string, enum: [Active, Deactivated] }
+        twoFactorEnabled: { type: boolean }
+        lastLoginAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    AuthTokens:
+      type: object
+      properties:
+        accessToken: { type: string, description: "Short-lived JWT (~15 min)" }
+        refreshToken: { type: string, description: "Set as an httpOnly cookie in practice; included here for API-client completeness" }
+        expiresIn: { type: integer, description: "Access token TTL in seconds" }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName, marketingConsent]
+      properties:
+        email: { type: string, format: email }
+        phone: { type: string }
+        password: { type: string, minLength: 10 }
+        fullName: { type: string }
+        termsAccepted: { type: boolean, description: "Must be true; distinct from medical-data consent per NFR-COMP-02" }
+        marketingConsent: { type: boolean }
+
+    LoginRequest:
+      type: object
+      required: [emailOrPhone, password]
+      properties:
+        emailOrPhone: { type: string }
+        password: { type: string }
+
+    Patient:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        fullName: { type: string }
+        phone: { type: string, nullable: true }
+        country: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Dependent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        fullName: { type: string }
+        relationship: { type: string }
+        dateOfBirth: { type: string, format: date }
+        createdAt: { type: string, format: date-time }
+
+    Hospital:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        citySlug: { type: string }
+        description: { type: string }
+        priceTier: { type: string, enum: ["$$", "$$$", "$$$$"] }
+        accreditations: { type: array, items: { type: string } }
+        languages: { type: array, items: { type: string } }
+        facilities: { type: array, items: { type: string } }
+        rating: { type: number, format: float }
+        reviewCount: { type: integer }
+        status: { type: string, enum: [Draft, PendingApproval, Published, Rejected] }
+
+    Doctor:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hospitalId: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        specialtySlug: { type: string }
+        credentials: { type: string }
+        yearsExperience: { type: integer }
+        languages: { type: array, items: { type: string } }
+        bio: { type: string }
+
+    TreatmentPackage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hospitalId: { type: string, format: uuid }
+        name: { type: string }
+        specialtySlug: { type: string }
+        description: { type: string }
+        priceMinUsd: { type: number }
+        priceMaxUsd: { type: number }
+        includes: { type: array, items: { type: string } }
+        status: { type: string, enum: [Draft, Active, Archived] }
+
+    Application:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        refNumber: { type: string, example: "CMT-2026-1042" }
+        patientId: { type: string, format: uuid }
+        dependentId: { type: string, format: uuid, nullable: true }
+        hospitalId: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid, nullable: true }
+        specialtySlug: { type: string }
+        status: { $ref: "#/components/schemas/CaseStatus" }
+        conditionSummary: { type: string, nullable: true }
+        medications: { type: string, nullable: true }
+        allergies: { type: string, nullable: true }
+        treatmentPlan: { type: string, nullable: true }
+        costEstimateMinUsd: { type: number, nullable: true }
+        costEstimateMaxUsd: { type: number, nullable: true }
+        caseManagerUserId: { type: string, format: uuid, nullable: true }
+        submittedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateApplicationRequest:
+      type: object
+      required: [specialtySlug, consentToProcessMedicalData]
+      properties:
+        hospitalId: { type: string, format: uuid, description: "Omit to let the platform suggest a match" }
+        doctorId: { type: string, format: uuid }
+        dependentId: { type: string, format: uuid, description: "Omit to apply on the account owner's own behalf" }
+        specialtySlug: { type: string }
+        preferredStartDate: { type: string, format: date, nullable: true }
+        datesFlexible: { type: boolean, default: true }
+        conditionSummary: { type: string }
+        medications: { type: string }
+        allergies: { type: string }
+        consentToProcessMedicalData: { type: boolean, description: "Must be true — distinct consent per NFR-COMP-02" }
+
+    ApplicationDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [Accept, RequestInfo, Decline] }
+        treatmentPlan: { type: string, description: "Required when decision=Accept" }
+        costEstimateMinUsd: { type: number }
+        costEstimateMaxUsd: { type: number }
+        message: { type: string, description: "Required when decision=RequestInfo or Decline" }
+
+    CaseMessage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        applicationId: { type: string, format: uuid }
+        senderUserId: { type: string, format: uuid }
+        senderRole: { $ref: "#/components/schemas/Role" }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    DocumentChecklistItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        applicationId: { type: string, format: uuid }
+        name: { type: string }
+        category: { type: string, enum: [MedicalRecords, IdentityDocuments, VisaDocuments] }
+        status: { type: string, enum: [NotUploaded, Uploaded, Verified, Rejected] }
+        note: { type: string, nullable: true }
+        downloadUrl: { type: string, format: uri, nullable: true, description: "Short-lived signed URL, generated per request — never stored" }
+        uploadedAt: { type: string, format: date-time, nullable: true }
+
+    InvitationLetter:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        applicationId: { type: string, format: uuid }
+        downloadUrl: { type: string, format: uri }
+        templateVersion: { type: string }
+        issuedAt: { type: string, format: date-time }
+
+    Hotel:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        citySlug: { type: string }
+        address: { type: string, nullable: true }
+        rating: { type: number }
+
+    HotelRoomType:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hotelId: { type: string, format: uuid }
+        name: { type: string }
+        roomCount: { type: integer }
+        baseRateUsd: { type: number }
+
+    HotelBooking:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hotelId: { type: string, format: uuid }
+        roomTypeId: { type: string, format: uuid }
+        applicationId: { type: string, format: uuid, nullable: true }
+        guestName: { type: string }
+        checkIn: { type: string, format: date }
+        checkOut: { type: string, format: date }
+        status: { type: string, enum: [Pending, Confirmed, Rejected, Cancelled] }
+
+    CreateHotelBookingRequest:
+      type: object
+      required: [roomTypeId, checkIn, checkOut]
+      properties:
+        applicationId: { type: string, format: uuid }
+        roomTypeId: { type: string, format: uuid }
+        checkIn: { type: string, format: date }
+        checkOut: { type: string, format: date }
+
+    TransferRequest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        applicationId: { type: string, format: uuid }
+        direction: { type: string, enum: [Arrival, Departure] }
+        flightNumber: { type: string, nullable: true }
+        scheduledAt: { type: string, format: date-time }
+        pickupLocation: { type: string }
+        driverId: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [Requested, Assigned, Completed, Cancelled] }
+
+    CreateTransferRequest:
+      type: object
+      required: [direction, scheduledAt, pickupLocation]
+      properties:
+        direction: { type: string, enum: [Arrival, Departure] }
+        flightNumber: { type: string }
+        scheduledAt: { type: string, format: date-time }
+        pickupLocation: { type: string }
+
+    InterpreterAssignment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        applicationId: { type: string, format: uuid }
+        interpreterId: { type: string, format: uuid, nullable: true }
+        hospitalVisitAt: { type: string, format: date-time }
+        department: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        status: { type: string, enum: [Requested, Assigned, Completed, Cancelled] }
+
+    Invoice:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        applicationId: { type: string, format: uuid }
+        description: { type: string }
+        amountUsd: { type: number }
+        status: { type: string, enum: [Due, Paid, Refunded, Cancelled] }
+        dueDate: { type: string, format: date, nullable: true }
+
+    Payment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        invoiceId: { type: string, format: uuid }
+        amountUsd: { type: number }
+        provider: { type: string, example: stripe }
+        providerRef: { type: string }
+        paidAt: { type: string, format: date-time }
+
+    CreatePaymentRequest:
+      type: object
+      required: [invoiceId, paymentMethodToken]
+      properties:
+        invoiceId: { type: string, format: uuid }
+        paymentMethodToken: { type: string, description: "Tokenized payment method from the client-side payment provider SDK — never a raw card number, per NFR-SEC-03" }
+
+    Refund:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        paymentId: { type: string, format: uuid }
+        amountUsd: { type: number }
+        reason: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    CommissionRate:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        partnerType: { type: string, enum: [Hospital, Hotel, Transport] }
+        hospitalId: { type: string, format: uuid, nullable: true }
+        hotelId: { type: string, format: uuid, nullable: true }
+        rate: { type: number, description: "Decimal fraction, e.g. 0.12 = 12%" }
+
+    Review:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        applicationId: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        hospitalId: { type: string, format: uuid }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        text: { type: string }
+        status: { type: string, enum: [Pending, Approved, Rejected, Redacted] }
+        createdAt: { type: string, format: date-time }
+
+    CreateReviewRequest:
+      type: object
+      required: [applicationId, rating, text]
+      properties:
+        applicationId: { type: string, format: uuid, description: "Must reference a case with status=Completed, per BR-20" }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        text: { type: string }
+
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        body: { type: string }
+        category: { type: string }
+        channel: { type: string, enum: [Email, SMS, InApp] }
+        linkUrl: { type: string, nullable: true }
+        readAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    NotificationPreference:
+      type: object
+      properties:
+        category: { type: string }
+        emailEnabled: { type: boolean }
+        smsEnabled: { type: boolean }
+        inAppEnabled: { type: boolean }
+
+    Article:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        title: { type: string }
+        excerpt: { type: string, nullable: true }
+        body: { type: string }
+        category: { type: string, nullable: true }
+        status: { type: string, enum: [Draft, Published] }
+        publishedAt: { type: string, format: date-time, nullable: true }
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        actorLabel: { type: string }
+        action: { type: string }
+        targetType: { type: string }
+        targetLabel: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    PlatformAnalytics:
+      type: object
+      properties:
+        bookingsThisMonth: { type: integer }
+        revenueThisMonthUsd: { type: number }
+        activeCases: { type: integer }
+        slaComplianceRate: { type: number }
+        conversionFunnel:
+          type: array
+          items:
+            type: object
+            properties:
+              stage: { type: string }
+              count: { type: integer }
+
+paths:
+  # -------------------------------------------------------------------------
+  # Auth — FR-AUTH-01 through FR-AUTH-07
+  # -------------------------------------------------------------------------
+  /auth/register:
+    post:
+      operationId: postAuthRegister
+      tags: [Auth]
+      summary: Register a new patient account (FR-AUTH-01)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "201":
+          description: Account created; verification code sent (FR-AUTH-02).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: "#/components/schemas/User" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /auth/verify:
+    post:
+      operationId: postAuthVerify
+      tags: [Auth]
+      summary: Verify email/phone via OTP (FR-AUTH-02)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, code]
+              properties:
+                userId: { type: string, format: uuid }
+                code: { type: string }
+      responses:
+        "200":
+          description: Verified.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthTokens" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+
+  /auth/login:
+    post:
+      operationId: postAuthLogin
+      tags: [Auth]
+      summary: Log in with email/phone and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Authenticated. If the account has 2FA enabled (FR-AUTH-05), a `twoFactorRequired` flag is returned instead of tokens.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/AuthTokens"
+                  - type: object
+                    properties:
+                      twoFactorRequired: { type: boolean }
+                      challengeId: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/2fa/verify:
+    post:
+      operationId: postAuth2faVerify
+      tags: [Auth]
+      summary: Complete login with a TOTP code (FR-AUTH-05)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, code]
+              properties:
+                challengeId: { type: string }
+                code: { type: string }
+      responses:
+        "200":
+          description: Authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthTokens" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/refresh:
+    post:
+      operationId: postAuthRefresh
+      tags: [Auth]
+      summary: Rotate the refresh token for a new access token (docs/03-architecture/05-auth-security-architecture.md §1)
+      security: []
+      responses:
+        "200":
+          description: New token pair issued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthTokens" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/logout:
+    post:
+      operationId: postAuthLogout
+      tags: [Auth]
+      summary: Revoke the current session
+      responses:
+        "204": { description: Logged out. }
+
+  /auth/forgot-password:
+    post:
+      operationId: postAuthForgotPassword
+      tags: [Auth]
+      summary: Request a password reset link (FR-AUTH-03)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emailOrPhone]
+              properties:
+                emailOrPhone: { type: string }
+      responses:
+        "202": { description: "If the account exists, a reset link was sent. Always returns 202 to avoid account enumeration." }
+
+  /auth/reset-password:
+    post:
+      operationId: postAuthResetPassword
+      tags: [Auth]
+      summary: Complete a password reset (FR-AUTH-03)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resetToken, newPassword]
+              properties:
+                resetToken: { type: string }
+                newPassword: { type: string, minLength: 10 }
+      responses:
+        "200": { description: Password updated. }
+        "400": { $ref: "#/components/responses/ValidationError" }
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [Auth]
+      summary: Get the authenticated user's own profile
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # -------------------------------------------------------------------------
+  # Patients — FR-AUTH-06
+  # -------------------------------------------------------------------------
+  /patients/me:
+    get:
+      operationId: getPatientsMe
+      tags: [Patients]
+      summary: Get the current patient's profile
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Patient" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    patch:
+      operationId: patchPatientsMe
+      tags: [Patients]
+      summary: Update the current patient's profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName: { type: string }
+                phone: { type: string }
+                country: { type: string }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Patient" }
+
+  /patients/me/dependents:
+    get:
+      operationId: getPatientsMeDependents
+      tags: [Patients]
+      summary: List the current patient's dependents (FR-AUTH-06)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Dependent" }
+    post:
+      operationId: postPatientsMeDependents
+      tags: [Patients]
+      summary: Add a dependent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, relationship, dateOfBirth]
+              properties:
+                fullName: { type: string }
+                relationship: { type: string }
+                dateOfBirth: { type: string, format: date }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dependent" }
+
+  /patients/me/dependents/{dependentId}:
+    parameters:
+      - name: dependentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: patchPatientsMeDependentsByDependentId
+      tags: [Patients]
+      summary: Update a dependent
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Dependent" }
+      responses:
+        "200": { description: Updated. }
+    delete:
+      operationId: deletePatientsMeDependentsByDependentId
+      tags: [Patients]
+      summary: Remove a dependent
+      responses:
+        "204": { description: Removed. }
+
+  # -------------------------------------------------------------------------
+  # Hospitals — FR-HOSP-01 through FR-HOSP-07
+  # -------------------------------------------------------------------------
+  /hospitals:
+    get:
+      operationId: getHospitals
+      tags: [Hospitals]
+      summary: Search/browse published hospitals (FR-HOSP-06)
+      security: []
+      parameters:
+        - name: specialty
+          in: query
+          schema: { type: string }
+        - name: city
+          in: query
+          schema: { type: string }
+        - name: language
+          in: query
+          schema: { type: string }
+        - name: minRating
+          in: query
+          schema: { type: number }
+        - { $ref: "#/components/parameters/CursorParam" }
+        - { $ref: "#/components/parameters/LimitParam" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Hospital" }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /hospitals/{hospitalId}:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getHospitalsByHospitalId
+      tags: [Hospitals]
+      summary: Get hospital detail (public if status=Published)
+      security: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Hospital" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: patchHospitalsByHospitalId
+      tags: [Hospitals]
+      summary: Update hospital profile (hospital_staff only, scoped to own hospital per BR-03; submits a HospitalModerationItem rather than a live edit, per FR-HOSP-05)
+      responses:
+        "202": { description: Change submitted for Admin approval. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /hospitals/{hospitalId}/doctors:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getHospitalsByHospitalIdDoctors
+      tags: [Hospitals]
+      summary: List a hospital's doctors
+      security: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Doctor" }
+    post:
+      operationId: postHospitalsByHospitalIdDoctors
+      tags: [Hospitals]
+      summary: Add a doctor (hospital_staff, own hospital) (FR-HOSP-03)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Doctor" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Doctor" }
+
+  /hospitals/{hospitalId}/doctors/{doctorId}:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: doctorId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getHospitalsByHospitalIdDoctorsByDoctorId
+      tags: [Hospitals]
+      summary: Get doctor detail
+      security: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Doctor" }
+
+  /hospitals/{hospitalId}/packages:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getHospitalsByHospitalIdPackages
+      tags: [Hospitals]
+      summary: List a hospital's treatment packages (FR-HOSP-04)
+      security: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TreatmentPackage" }
+    post:
+      operationId: postHospitalsByHospitalIdPackages
+      tags: [Hospitals]
+      summary: Create a treatment package (hospital_staff, own hospital)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TreatmentPackage" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TreatmentPackage" }
+
+  /hospitals/{hospitalId}/reports:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getHospitalsByHospitalIdReports
+      tags: [Hospitals]
+      summary: Hospital-scoped booking/revenue/conversion report (FR-ANALYTICS-02, Screen 43)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlatformAnalytics" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # -------------------------------------------------------------------------
+  # Applications — FR-APP-01 through FR-APP-08
+  # -------------------------------------------------------------------------
+  /applications:
+    get:
+      operationId: getApplications
+      tags: [Applications]
+      summary: >
+        List applications. Scope depends on caller role: a patient sees their own
+        cases; hospital_staff see their hospital's queue (BR-03); case_manager/admin
+        see the cross-hospital Ops queue (Screen 44), filterable via `view`.
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/CaseStatus" }
+        - name: view
+          in: query
+          description: "case_manager/admin only: mine | urgent | unassigned"
+          schema: { type: string, enum: [mine, urgent, unassigned] }
+        - { $ref: "#/components/parameters/CursorParam" }
+        - { $ref: "#/components/parameters/LimitParam" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Application" }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+    post:
+      operationId: postApplications
+      tags: [Applications]
+      summary: Submit a treatment application (FR-APP-01, FR-APP-03)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateApplicationRequest" }
+      responses:
+        "201":
+          description: Submitted; status=Submitted, hospital notified per FR-NOTIF-01.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Application" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /applications/{applicationId}:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    get:
+      operationId: getApplicationsByApplicationId
+      tags: [Applications]
+      summary: Get case detail (FR-APP-06)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Application" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /applications/{applicationId}/decision:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    post:
+      operationId: postApplicationsByApplicationIdDecision
+      tags: [Applications]
+      summary: Accept / request info / decline an application (hospital_staff only) (FR-APP-04)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApplicationDecisionRequest" }
+      responses:
+        "200":
+          description: >
+            Status updated. If decision=Accept, a case manager is auto-assigned per
+            FR-APP-05.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Application" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /applications/{applicationId}/reassign:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    post:
+      operationId: postApplicationsByApplicationIdReassign
+      tags: [Applications]
+      summary: Reassign the case manager (case_manager/admin only, Screen 45)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [caseManagerUserId]
+              properties:
+                caseManagerUserId: { type: string, format: uuid }
+      responses:
+        "200": { description: Reassigned. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /applications/{applicationId}/messages:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    get:
+      operationId: getApplicationsByApplicationIdMessages
+      tags: [Applications]
+      summary: List messages on a case (FR-APP-07)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CaseMessage" }
+    post:
+      operationId: postApplicationsByApplicationIdMessages
+      tags: [Applications]
+      summary: Send a message on a case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string }
+      responses:
+        "201":
+          description: Sent; recipients notified per FR-NOTIF-01.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CaseMessage" }
+
+  /applications/{applicationId}/internal-notes:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    get:
+      operationId: getApplicationsByApplicationIdInternalNotes
+      tags: [Applications]
+      summary: >
+        List internal notes (case_manager/admin only — never returned to patient or
+        hospital-scoped callers, Screen 45)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    authorUserId: { type: string, format: uuid }
+                    note: { type: string }
+                    createdAt: { type: string, format: date-time }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: postApplicationsByApplicationIdInternalNotes
+      tags: [Applications]
+      summary: Add an internal note (case_manager/admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: { type: string }
+      responses:
+        "201": { description: Added. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # -------------------------------------------------------------------------
+  # Documents — FR-VISA-01 through FR-VISA-05
+  # -------------------------------------------------------------------------
+  /applications/{applicationId}/documents:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    get:
+      operationId: getApplicationsByApplicationIdDocuments
+      tags: [Documents]
+      summary: Get the document checklist for a case (FR-VISA-01)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DocumentChecklistItem" }
+
+  /applications/{applicationId}/documents/{documentId}/upload:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+      - name: documentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postApplicationsByApplicationIdDocumentsByDocumentIdUpload
+      tags: [Documents]
+      summary: >
+        Upload a file for a checklist item (FR-VISA-01). Multipart upload; the
+        backend validates format/size, encrypts at rest, and stores an
+        access-controlled object-storage reference per
+        docs/03-architecture/06-storage-caching-search.md §1 — never a public URL.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: Uploaded; status transitions to Uploaded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentChecklistItem" }
+
+  /applications/{applicationId}/documents/{documentId}/verify:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+      - name: documentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postApplicationsByApplicationIdDocumentsByDocumentIdVerify
+      tags: [Documents]
+      summary: Verify or reject an uploaded document (case_manager only) (FR-VISA-01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved]
+              properties:
+                approved: { type: boolean }
+                note: { type: string }
+      responses:
+        "200":
+          description: Updated; access logged per NFR-SEC-07.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentChecklistItem" }
+
+  /applications/{applicationId}/invitation-letter:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    post:
+      operationId: postApplicationsByApplicationIdInvitationLetter
+      tags: [Documents]
+      summary: Generate the invitation letter (case_manager only) (FR-VISA-02, BR-17)
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      responses:
+        "201":
+          description: >
+            Generated (only permitted once the hospital has accepted and the deposit
+            invoice is paid, per BR-17).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationLetter" }
+        "409": { description: "Case has not yet met the BR-17 preconditions." }
+
+  # -------------------------------------------------------------------------
+  # Hotels — FR-HOTEL-01 through FR-HOTEL-05
+  # -------------------------------------------------------------------------
+  /hotels:
+    get:
+      operationId: getHotels
+      tags: [Hotels]
+      summary: Search hotels (FR-HOTEL-01)
+      parameters:
+        - name: city
+          in: query
+          schema: { type: string }
+        - name: nearHospitalId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Hotel" }
+
+  /hotels/{hotelId}/room-types:
+    parameters:
+      - name: hotelId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getHotelsByHotelIdRoomTypes
+      tags: [Hotels]
+      summary: List room types and availability
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/HotelRoomType" }
+    post:
+      operationId: postHotelsByHotelIdRoomTypes
+      tags: [Hotels]
+      summary: Add a room type (hotel_partner, own hotel) (Screen 56)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HotelRoomType" }
+      responses:
+        "201": { description: Created. }
+
+  /hotels/{hotelId}/bookings:
+    parameters:
+      - name: hotelId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getHotelsByHotelIdBookings
+      tags: [Hotels]
+      summary: List bookings for a hotel (hotel_partner, own hotel) (Screen 57)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/HotelBooking" }
+    post:
+      operationId: postHotelsByHotelIdBookings
+      tags: [Hotels]
+      summary: Request a hotel booking (patient) (FR-HOTEL-03)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateHotelBookingRequest" }
+      responses:
+        "201":
+          description: Requested; status=Pending until the hotel confirms.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HotelBooking" }
+
+  /hotel-bookings/{bookingId}/confirm:
+    parameters:
+      - name: bookingId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postHotelBookingsByBookingIdConfirm
+      tags: [Hotels]
+      summary: Confirm a pending booking (hotel_partner only)
+      responses:
+        "200": { description: Confirmed; patient notified. }
+
+  /hotel-bookings/{bookingId}/reject:
+    parameters:
+      - name: bookingId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postHotelBookingsByBookingIdReject
+      tags: [Hotels]
+      summary: Reject a pending booking (hotel_partner only)
+      responses:
+        "200": { description: Rejected; patient notified to pick an alternative. }
+
+  # -------------------------------------------------------------------------
+  # Transport — FR-XFER-01 through FR-XFER-04, FR-INTERP-01 through FR-INTERP-03
+  # -------------------------------------------------------------------------
+  /applications/{applicationId}/transfers:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    get:
+      operationId: getApplicationsByApplicationIdTransfers
+      tags: [Transport]
+      summary: List transfer requests for a case
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TransferRequest" }
+    post:
+      operationId: postApplicationsByApplicationIdTransfers
+      tags: [Transport]
+      summary: Request an airport transfer (patient) (FR-XFER-01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTransferRequest" }
+      responses:
+        "201":
+          description: Requested.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TransferRequest" }
+
+  /transfers/{transferId}/assign:
+    parameters:
+      - name: transferId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postTransfersByTransferIdAssign
+      tags: [Transport]
+      summary: Assign a driver (case_manager/admin only) (FR-XFER-02, BR-23)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [driverId]
+              properties:
+                driverId: { type: string, format: uuid }
+      responses:
+        "200": { description: Assigned; driver and patient notified. }
+
+  /transfers/{transferId}/complete:
+    parameters:
+      - name: transferId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postTransfersByTransferIdComplete
+      tags: [Transport]
+      summary: Mark a transfer complete (driver only, own assignment) (FR-XFER-04)
+      responses:
+        "200": { description: Completed; unlocks driver payment eligibility per BR-24. }
+
+  /drivers/me/trips:
+    get:
+      operationId: getDriversMeTrips
+      tags: [Transport]
+      summary: List the authenticated driver's assigned trips (FR-XFER-03, Screen 58)
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [Assigned, Completed] }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TransferRequest" }
+
+  /applications/{applicationId}/interpreter-sessions:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    get:
+      operationId: getApplicationsByApplicationIdInterpreterSessions
+      tags: [Transport]
+      summary: List interpreter sessions for a case
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InterpreterAssignment" }
+    post:
+      operationId: postApplicationsByApplicationIdInterpreterSessions
+      tags: [Transport]
+      summary: Request an interpreter session (case_manager only) (FR-INTERP-01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hospitalVisitAt]
+              properties:
+                hospitalVisitAt: { type: string, format: date-time }
+                department: { type: string }
+                note: { type: string }
+      responses:
+        "201": { description: Requested. }
+
+  /interpreter-sessions/{sessionId}/assign:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postInterpreterSessionsBySessionIdAssign
+      tags: [Transport]
+      summary: Assign an interpreter (case_manager/admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [interpreterId]
+              properties:
+                interpreterId: { type: string, format: uuid }
+      responses:
+        "200": { description: Assigned. }
+
+  /interpreter-sessions/{sessionId}/complete:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postInterpreterSessionsBySessionIdComplete
+      tags: [Transport]
+      summary: Mark an interpreter session complete (interpreter only, own assignment)
+      responses:
+        "200": { description: Completed. }
+
+  /interpreters/me/appointments:
+    get:
+      operationId: getInterpretersMeAppointments
+      tags: [Transport]
+      summary: List the authenticated interpreter's assigned appointments (FR-INTERP-02, Screen 59)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InterpreterAssignment" }
+
+  # -------------------------------------------------------------------------
+  # Payments — FR-PAY-01 through FR-PAY-06
+  # -------------------------------------------------------------------------
+  /applications/{applicationId}/invoices:
+    parameters:
+      - { $ref: "#/components/parameters/ApplicationIdParam" }
+    get:
+      operationId: getApplicationsByApplicationIdInvoices
+      tags: [Payments]
+      summary: List invoices for a case (FR-PAY-03)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Invoice" }
+
+  /invoices/{invoiceId}/pay:
+    parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postInvoicesByInvoiceIdPay
+      tags: [Payments]
+      summary: Pay an invoice (patient) (FR-PAY-01, FR-PAY-02)
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePaymentRequest" }
+      responses:
+        "201":
+          description: Paid.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Payment" }
+        "402": { description: Payment declined by the processor. }
+
+  /invoices/{invoiceId}/receipt:
+    parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getInvoicesByInvoiceIdReceipt
+      tags: [Payments]
+      summary: Download a PDF receipt/invoice (FR-PAY-05)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+
+  /payments/{paymentId}/refund:
+    parameters:
+      - name: paymentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postPaymentsByPaymentIdRefund
+      tags: [Payments]
+      summary: Process a refund (admin only) (FR-PAY-04)
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountUsd, reason]
+              properties:
+                amountUsd: { type: number }
+                reason: { type: string }
+      responses:
+        "201":
+          description: Refunded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Refund" }
+
+  /payments/me:
+    get:
+      operationId: getPaymentsMe
+      tags: [Payments]
+      summary: Cross-case payment history for the current patient (Screen 33)
+      parameters:
+        - { $ref: "#/components/parameters/CursorParam" }
+        - { $ref: "#/components/parameters/LimitParam" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Payment" }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /admin/commission-rates:
+    get:
+      operationId: getAdminCommissionRates
+      tags: [Payments]
+      summary: List commission rates (admin only) (FR-PAY-06, Screen 51)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CommissionRate" }
+    post:
+      operationId: postAdminCommissionRates
+      tags: [Payments]
+      summary: Set a commission rate (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommissionRate" }
+      responses:
+        "201": { description: Created. }
+
+  /admin/transactions:
+    get:
+      operationId: getAdminTransactions
+      tags: [Payments]
+      summary: Platform-wide transaction ledger (admin only) (Screen 51)
+      parameters:
+        - { $ref: "#/components/parameters/CursorParam" }
+        - { $ref: "#/components/parameters/LimitParam" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Payment" }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  # -------------------------------------------------------------------------
+  # Reviews — FR-REVIEW-01 through FR-REVIEW-03
+  # -------------------------------------------------------------------------
+  /reviews:
+    post:
+      operationId: postReviews
+      tags: [Reviews]
+      summary: Submit a review for a completed case (patient) (FR-REVIEW-01, BR-20)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReviewRequest" }
+      responses:
+        "201":
+          description: Submitted; status=Pending until moderated (FR-REVIEW-02).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Review" }
+        "409": { description: "Case status is not Completed, or a review already exists for this case (BR-20)." }
+
+  /hospitals/{hospitalId}/reviews:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getHospitalsByHospitalIdReviews
+      tags: [Reviews]
+      summary: List approved reviews for a hospital (public)
+      security: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Review" }
+
+  /admin/reviews:
+    get:
+      operationId: getAdminReviews
+      tags: [Reviews]
+      summary: List reviews pending moderation (admin only) (Screen 50)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Review" }
+
+  /admin/reviews/{reviewId}/moderate:
+    parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postAdminReviewsByReviewIdModerate
+      tags: [Reviews]
+      summary: Approve, redact, or reject a review (admin only) (FR-REVIEW-02, BR-21)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [Approve, Redact, Reject] }
+                redactedText: { type: string, description: "Required when decision=Redact" }
+      responses:
+        "200":
+          description: Moderated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Review" }
+
+  # -------------------------------------------------------------------------
+  # Notifications — FR-NOTIF-01 through FR-NOTIF-04
+  # -------------------------------------------------------------------------
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [Notifications]
+      summary: List the current user's notifications (FR-NOTIF-02)
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - { $ref: "#/components/parameters/CursorParam" }
+        - { $ref: "#/components/parameters/LimitParam" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Notification" }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /notifications/{notificationId}/read:
+    parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postNotificationsByNotificationIdRead
+      tags: [Notifications]
+      summary: Mark a notification as read
+      responses:
+        "200": { description: OK. }
+
+  /notifications/read-all:
+    post:
+      operationId: postNotificationsReadAll
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200": { description: OK. }
+
+  /notifications/preferences:
+    get:
+      operationId: getNotificationsPreferences
+      tags: [Notifications]
+      summary: Get channel preferences per category (FR-NOTIF-04)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/NotificationPreference" }
+    put:
+      operationId: putNotificationsPreferences
+      tags: [Notifications]
+      summary: Update channel preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: "#/components/schemas/NotificationPreference" }
+      responses:
+        "200": { description: Updated. }
+
+  # -------------------------------------------------------------------------
+  # CMS — FR-CMS-01, FR-CMS-02
+  # -------------------------------------------------------------------------
+  /articles:
+    get:
+      operationId: getArticles
+      tags: [CMS]
+      summary: List published articles (public)
+      security: []
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Article" }
+    post:
+      operationId: postArticles
+      tags: [CMS]
+      summary: Create an article (admin only) (FR-CMS-01, Screen 52)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Article" }
+      responses:
+        "201":
+          description: Created as Draft.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Article" }
+
+  /articles/{slug}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getArticlesBySlug
+      tags: [CMS]
+      summary: Get an article by slug (public if Published)
+      security: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Article" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: patchArticlesBySlug
+      tags: [CMS]
+      summary: Update/publish an article (admin only)
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Article" }
+      responses:
+        "200": { description: Updated. }
+
+  # -------------------------------------------------------------------------
+  # Admin — FR-OPS-01 through FR-OPS-06, FR-ANALYTICS-01
+  # -------------------------------------------------------------------------
+  /admin/dashboard:
+    get:
+      operationId: getAdminDashboard
+      tags: [Admin]
+      summary: Platform-wide analytics (admin only) (FR-ANALYTICS-01, Screen 47)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlatformAnalytics" }
+
+  /admin/users:
+    get:
+      operationId: getAdminUsers
+      tags: [Admin]
+      summary: List/search platform users (admin only) (FR-OPS-03, Screen 48)
+      parameters:
+        - name: role
+          in: query
+          schema: { $ref: "#/components/schemas/Role" }
+        - { $ref: "#/components/parameters/CursorParam" }
+        - { $ref: "#/components/parameters/LimitParam" }
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+    post:
+      operationId: postAdminUsers
+      tags: [Admin]
+      summary: Invite a staff user (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { $ref: "#/components/schemas/Role" }
+      responses:
+        "201": { description: Invitation sent. }
+
+  /admin/users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: patchAdminUsersByUserId
+      tags: [Admin]
+      summary: Change a user's role or status (admin only) (FR-OPS-03)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: { $ref: "#/components/schemas/Role" }
+                status: { type: string, enum: [Active, Deactivated] }
+      responses:
+        "200":
+          description: Updated; change recorded in AuditLog per NFR-SEC-07.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+
+  /admin/hospitals/moderation-queue:
+    get:
+      operationId: getAdminHospitalsModerationQueue
+      tags: [Admin]
+      summary: List pending hospital listing changes (admin only) (FR-OPS-04, Screen 49)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    hospitalId: { type: string, format: uuid }
+                    changeSummary: { type: string }
+                    submittedAt: { type: string, format: date-time }
+
+  /admin/hospitals/moderation-queue/{itemId}/resolve:
+    parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postAdminHospitalsModerationQueueByItemIdResolve
+      tags: [Admin]
+      summary: Approve or reject a pending hospital listing change (admin only) (FR-HOSP-05)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved]
+              properties:
+                approved: { type: boolean }
+                rejectionReason: { type: string, description: "Required when approved=false" }
+      responses:
+        "200": { description: Resolved. }
+
+  /admin/audit-log:
+    get:
+      operationId: getAdminAuditLog
+      tags: [Admin]
+      summary: Read the append-only audit log (admin only) (NFR-SEC-07, BR-30, Screen 53)
+      parameters:
+        - name: targetType
+          in: query
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CursorParam" }
+        - { $ref: "#/components/parameters/LimitParam" }
+      responses:
+        "200":
+          description: OK. This endpoint is read-only — there is no corresponding write/delete operation, by design.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AuditLogEntry" }
+                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /admin/settings:
+    get:
+      operationId: getAdminSettings
+      tags: [Admin]
+      summary: Get platform settings (admin only) (Screen 54)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    put:
+      operationId: putAdminSettings
+      tags: [Admin]
+      summary: Update a platform setting (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, value]
+              properties:
+                key: { type: string }
+                value: {}
+      responses:
+        "200": { description: Updated. }
