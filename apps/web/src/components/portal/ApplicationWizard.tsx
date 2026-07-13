@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
-import { hospitals, specialties } from "@/data/hospitals";
+import { specialties } from "@/data/hospitals";
+import { searchHospitals, createApplication, ApiError, type Hospital } from "@/lib/api";
+import { useAuth } from "@/lib/auth-client";
 
 const steps = ["Specialty & Hospital", "Preferred Dates", "Medical History", "Documents", "Review & Submit"];
 
 export function ApplicationWizard() {
+  const router = useRouter();
+  const { accessToken } = useAuth();
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [matchingHospitals, setMatchingHospitals] = useState<Hospital[]>([]);
   const [form, setForm] = useState({
     specialty: specialties[0].slug as string,
     hospital: "",
@@ -21,12 +29,40 @@ export function ApplicationWizard() {
     consent: false,
   });
 
-  const matchingHospitals = hospitals.filter((h) =>
-    h.specialties.some((s) => s.toLowerCase().replace(/[^a-z]+/g, "-") === form.specialty)
-  );
+  useEffect(() => {
+    searchHospitals({ specialty: form.specialty })
+      .then(({ data }) => setMatchingHospitals(data))
+      .catch(() => setMatchingHospitals([]));
+  }, [form.specialty]);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function handleSubmit() {
+    if (!accessToken) {
+      router.push("/login");
+      return;
+    }
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      await createApplication(accessToken, {
+        hospitalId: form.hospital || undefined,
+        specialtySlug: form.specialty,
+        preferredStartDate: form.startDate || undefined,
+        datesFlexible: form.flexible,
+        conditionSummary: form.conditionSummary || undefined,
+        medications: form.medications || undefined,
+        allergies: form.allergies || undefined,
+        consentToProcessMedicalData: form.consent,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -109,7 +145,7 @@ export function ApplicationWizard() {
               >
                 <option value="">Not sure — help me choose</option>
                 {matchingHospitals.map((h) => (
-                  <option key={h.slug} value={h.slug}>
+                  <option key={h.id} value={h.id}>
                     {h.name}
                   </option>
                 ))}
@@ -202,6 +238,9 @@ export function ApplicationWizard() {
         {step === 4 ? (
           <div className="flex flex-col gap-4">
             <h2 className="font-bold text-neutral-900">Review &amp; submit</h2>
+            {submitError ? (
+              <p className="rounded-md bg-danger-50 px-3 py-2 text-sm text-danger-700">{submitError}</p>
+            ) : null}
             <dl className="flex flex-col gap-2 text-sm">
               <div className="flex justify-between border-b border-neutral-100 pb-2">
                 <dt className="text-neutral-500">Specialty</dt>
@@ -212,7 +251,7 @@ export function ApplicationWizard() {
               <div className="flex justify-between border-b border-neutral-100 pb-2">
                 <dt className="text-neutral-500">Hospital</dt>
                 <dd className="font-semibold text-neutral-900">
-                  {hospitals.find((h) => h.slug === form.hospital)?.name ?? "Not sure — help me choose"}
+                  {matchingHospitals.find((h) => h.id === form.hospital)?.name ?? "Not sure — help me choose"}
                 </dd>
               </div>
               <div className="flex justify-between border-b border-neutral-100 pb-2">
@@ -255,8 +294,8 @@ export function ApplicationWizard() {
             Continue
           </Button>
         ) : (
-          <Button disabled={!form.consent} onClick={() => setSubmitted(true)}>
-            Submit Application
+          <Button disabled={!form.consent || submitting} onClick={handleSubmit}>
+            {submitting ? "Submitting…" : "Submit Application"}
           </Button>
         )}
       </div>

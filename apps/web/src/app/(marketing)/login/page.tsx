@@ -1,13 +1,35 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/Section";
 import { Button } from "@/components/Button";
-
-export const metadata: Metadata = {
-  title: "Log In",
-};
+import { useAuth } from "@/lib/auth-client";
+import { ApiError } from "@/lib/api";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { login } = useAuth();
+  const [emailOrPhone, setEmailOrPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(emailOrPhone, password);
+      router.push("/app/dashboard");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <Container className="flex min-h-[70vh] items-center justify-center py-16">
       <div className="w-full max-w-sm rounded-[10px] border border-neutral-300 bg-white p-8 shadow-sm">
@@ -15,7 +37,10 @@ export default function LoginPage() {
         <p className="mt-1 text-sm text-neutral-500">
           Access your case, messages, and itinerary.
         </p>
-        <form className="mt-6 flex flex-col gap-4">
+        <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
+          {error ? (
+            <p className="rounded-md bg-danger-50 px-3 py-2 text-sm text-danger-700">{error}</p>
+          ) : null}
           <div className="flex flex-col gap-1">
             <label htmlFor="email" className="text-sm font-semibold text-neutral-900">
               Email or phone
@@ -24,6 +49,9 @@ export default function LoginPage() {
               id="email"
               name="email"
               type="text"
+              value={emailOrPhone}
+              onChange={(e) => setEmailOrPhone(e.target.value)}
+              required
               className="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:outline-2 focus:outline-primary-600"
             />
           </div>
@@ -40,11 +68,14 @@ export default function LoginPage() {
               id="password"
               name="password"
               type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
               className="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:outline-2 focus:outline-primary-600"
             />
           </div>
-          <Button type="submit" className="w-full">
-            Log In
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting ? "Logging in…" : "Log In"}
           </Button>
         </form>
         <p className="mt-6 text-center text-sm text-neutral-600">
