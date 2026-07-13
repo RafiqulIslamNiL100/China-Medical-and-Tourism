@@ -780,6 +780,10 @@ export function getAdminDashboard(accessToken: string) {
   return request<PlatformAnalytics>("/admin/dashboard", { accessToken });
 }
 
+export function listAllArticles(accessToken: string) {
+  return request<Article[]>("/admin/articles", { accessToken });
+}
+
 export function listAdminUsers(accessToken: string, query: { role?: Role; cursor?: string; limit?: number } = {}) {
   return request<Paginated<User>>("/admin/users", { accessToken, query });
 }

@@ -2189,6 +2189,20 @@ paths:
                     items: { $ref: "#/components/schemas/AuditLogEntry" }
                   meta: { $ref: "#/components/schemas/PaginatedMeta" }
 
+  /admin/articles:
+    get:
+      operationId: getAdminArticles
+      tags: [Admin]
+      summary: List all CMS articles including drafts (admin only), for the CMS console (Screen 52)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Article" }
+
   /admin/settings:
     get:
       operationId: getAdminSettings
