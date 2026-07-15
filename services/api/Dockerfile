@@ -31,4 +31,10 @@ EXPOSE 3001
 # Applies any pending Postgres migrations (no-op if already applied), then starts the
 # server. DATABASE_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET must be set in the host's
 # environment — see services/api/.env.example.
-CMD ["sh", "-c", "npx prisma migrate deploy --schema database/prisma/schema.prisma && node services/api/dist/main.js"]
+#
+# The echo markers make the platform's deploy logs self-diagnosing: if you see
+# "[boot] applying migrations..." but never "[boot] migrations applied", the container
+# died in migrate deploy — i.e. it can't reach DATABASE_URL (the #1 cause of a
+# "successful build" that then fails to respond). Seeing "launching server" followed by
+# no "listening" line points at the app/port instead. PORT is safe to log; secrets are not.
+CMD ["sh", "-c", "echo \"[boot] starting; PORT=${PORT:-3001}\" && echo '[boot] applying migrations...' && npx prisma migrate deploy --schema database/prisma/schema.prisma && echo '[boot] migrations applied; launching server...' && node services/api/dist/main.js"]

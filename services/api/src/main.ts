@@ -15,7 +15,9 @@ async function bootstrap() {
   app.set("trust proxy", 1);
 
   app.use(helmet());
-  app.setGlobalPrefix("v1", { exclude: ["health"] });
+  // Both health paths are excluded from prefix rewriting so the literal routes in
+  // health.controller.ts serve as-is: /health (canonical) and /v1/health (alias).
+  app.setGlobalPrefix("v1", { exclude: ["health", "v1/health"] });
 
   // CORS_ORIGINS: comma-separated allowlist (e.g. "https://china-medical-and-tourism.vercel.app").
   // Unset = allow all origins, for local development only — always set it in production.
@@ -36,8 +38,15 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3001;
   await app.listen(port, "0.0.0.0");
+  // The PORT detail matters operationally: if the platform injects PORT but its edge
+  // proxy targets a different port (e.g. a domain pinned to 3001 while PORT=8080),
+  // every request dies with "Application failed to respond" even though the app is
+  // healthy — this line makes that mismatch visible in the runtime logs immediately.
   // eslint-disable-next-line no-console
-  console.log(`CMT API listening on http://0.0.0.0:${port}/v1`);
+  console.log(
+    `CMT API listening on http://0.0.0.0:${port} (PORT env: ${process.env.PORT ?? "unset — defaulted to 3001"}). ` +
+      `Ensure the platform's public domain targets this exact port.`,
+  );
 }
 
 bootstrap();
