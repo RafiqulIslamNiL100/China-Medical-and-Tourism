@@ -707,7 +707,7 @@ async function main() {
 
   await prisma.platformSetting.createMany({
     data: [
-      { key: "platform_name", value: "Asia Health Link and Travel" },
+      { key: "platform_name", value: "Asia Health Link & Travel" },
       { key: "support_email", value: "support@asiahealthlink.com" },
       { key: "default_deposit_rate", value: 0.2 },
     ],

@@ -3,13 +3,13 @@ import { Container, PageHero } from "@/components/Section";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: "The terms governing your use of the Asia Health Link and Travel platform.",
+  description: "The terms governing your use of the Asia Health Link & Travel platform.",
 };
 
 const sections = [
   {
     title: "1. Description of Service",
-    body: "Asia Health Link and Travel is a facilitation and coordination service. We connect patients with independent, licensed hospitals and doctors in China, and help coordinate related travel logistics and visa-documentation support. We do not provide medical care, diagnosis, or treatment ourselves.",
+    body: "Asia Health Link & Travel is a facilitation and coordination service. We connect patients with independent, licensed hospitals and doctors in China, and help coordinate related travel logistics and visa-documentation support. We do not provide medical care, diagnosis, or treatment ourselves.",
   },
   {
     title: "2. Medical Disclaimer",

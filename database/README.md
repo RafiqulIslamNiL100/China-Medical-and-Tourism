@@ -1,6 +1,6 @@
 # Database
 
-Prisma schema for the Asia Health Link and Travel platform. See
+Prisma schema for the Asia Health Link & Travel platform. See
 `docs/06-database-design/` for the entity-relationship overview and field-by-field
 schema reference, and `docs/03-architecture/04-database-architecture.md` for the
 platform/topology decisions this schema implements.

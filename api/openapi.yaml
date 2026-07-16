@@ -1,10 +1,10 @@
 openapi: 3.0.3
 
 info:
-  title: Asia Health Link and Travel API
+  title: Asia Health Link & Travel API
   version: "1.0.0"
   description: >
-    REST API for the Asia Health Link and Travel platform. Implements the conventions
+    REST API for the Asia Health Link & Travel platform. Implements the conventions
     fixed in docs/03-architecture/03-backend-api-architecture.md and
     docs/PROJECT_CONTEXT.md §8: REST/JSON under /api/v1, bearer JWT auth,
     cursor-based pagination for high-growth lists, a consistent error shape, and

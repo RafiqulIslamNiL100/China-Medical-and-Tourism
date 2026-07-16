@@ -51,7 +51,7 @@ export function PortalTopBar() {
       <div className="flex items-center justify-between gap-4 px-4 py-3 lg:px-6">
         <Link href="/" className="flex items-center gap-2 font-bold text-neutral-900 lg:hidden">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary-600 text-xs text-white">
-            AH
+            AHL
           </span>
         </Link>
         <span className="hidden lg:inline-block" />

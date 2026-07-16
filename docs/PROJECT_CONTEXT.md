@@ -9,7 +9,7 @@
 
 ## 1. Business Overview
 
-**Asia Health Link and Travel** is a two-sided marketplace and coordination platform
+**Asia Health Link & Travel** is a two-sided marketplace and coordination platform
 connecting international patients with accredited hospitals in China, bundling the
 medical journey with visa support, hotel booking, airport transfers, and interpretation —
 so a patient can book world-class treatment as coordinated as booking a flight and hotel.

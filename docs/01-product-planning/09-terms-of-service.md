@@ -10,7 +10,7 @@
 
 ## 1. Acceptance of Terms
 
-By creating an account or using Asia Health Link and Travel (the "Platform"), you agree to
+By creating an account or using Asia Health Link & Travel (the "Platform"), you agree to
 these Terms of Service ("Terms"). If you do not agree, do not use the Platform.
 
 ## 2. Description of Service

@@ -21,7 +21,7 @@ export interface SendEmailInput {
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger("EmailService");
   private client: Resend | null = null;
-  private fromAddress = "Asia Health Link and Travel <onboarding@resend.dev>";
+  private fromAddress = "Asia Health Link & Travel <onboarding@resend.dev>";
   private usingSandboxSender = true;
 
   constructor(private readonly config: ConfigService) {}
@@ -39,7 +39,7 @@ export class EmailService implements OnModuleInit {
         // Resend's onboarding@resend.dev sender only delivers to the Resend account's
         // own verified owner address — it silently cannot reach real patients/users.
         // Verify a domain in the Resend dashboard and set RESEND_FROM_EMAIL to an
-        // address on it (e.g. "Asia Health Link and Travel <noreply@yourdomain.com>")
+        // address on it (e.g. "Asia Health Link & Travel <noreply@yourdomain.com>")
         // before relying on OTP/notification email in production.
         this.logger.warn(
           "RESEND_FROM_EMAIL is unset or still using onboarding@resend.dev — Resend's " +

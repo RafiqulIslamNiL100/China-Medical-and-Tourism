@@ -40,7 +40,7 @@ In the same Railway project: **New → GitHub Repo** → select this repo.
 | `JWT_ACCESS_SECRET` | A long random string — **not** the dev placeholder in `.env.example` |
 | `JWT_REFRESH_SECRET` | A different long random string |
 | `RESEND_API_KEY` | Your Resend API key (optional — omit it and email just logs server-side instead of sending) |
-| `RESEND_FROM_EMAIL` | e.g. `"Asia Health Link and Travel <noreply@yourdomain.com>"` — **must** be an address on a domain you've verified in Resend once you have real users (see below) |
+| `RESEND_FROM_EMAIL` | e.g. `"Asia Health Link & Travel <noreply@yourdomain.com>"` — **must** be an address on a domain you've verified in Resend once you have real users (see below) |
 
 > **OTP/verification emails not reaching real users?** The default sender
 > (`onboarding@resend.dev`, used when `RESEND_FROM_EMAIL` is unset) is Resend's sandbox
@@ -48,7 +48,7 @@ In the same Railway project: **New → GitHub Repo** → select this repo.
 > never to real patients. To fix: in the Resend dashboard, go to **Domains → Add Domain**,
 > verify your domain (e.g. `asiahealthlink.com`) via the DNS records Resend gives you,
 > then set `RESEND_FROM_EMAIL` to an address on that domain (e.g.
-> `"Asia Health Link and Travel <noreply@asiahealthlink.com>"`) and redeploy. Until that's
+> `"Asia Health Link & Travel <noreply@asiahealthlink.com>"`) and redeploy. Until that's
 > done, every OTP email to a real patient fails silently — check the backend logs for a
 > `Resend send failed` line, which now names this exact cause.
 | `CORS_ORIGINS` | Comma-separated list of allowed frontend origins, e.g. `https://your-app.vercel.app` (optional — omit it during setup and the API allows all origins, which is fine short-term but should be locked down before calling this production) |

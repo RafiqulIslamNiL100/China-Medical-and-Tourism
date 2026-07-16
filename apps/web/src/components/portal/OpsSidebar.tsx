@@ -16,7 +16,7 @@ export function OpsSidebar() {
       <div className="sticky top-0 flex h-screen flex-col gap-1 overflow-y-auto p-4">
         <Link href="/" className="mb-4 flex items-center gap-2 px-2 font-bold text-neutral-900">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary-600 text-xs text-white">
-            AH
+            AHL
           </span>
           Operations
         </Link>
