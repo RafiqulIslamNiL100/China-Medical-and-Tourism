@@ -17,7 +17,7 @@ export function Header() {
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600 text-sm text-white">
             CMT
           </span>
-          <span className="hidden sm:inline">China Medical &amp; Tourism</span>
+          <span className="hidden sm:inline">Asia Health Link &amp; Travel</span>
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">
