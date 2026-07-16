@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Container, PageHero } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
-import { cities, specialties } from "@/data/hospitals";
-import { searchHospitals } from "@/lib/api";
+import { listCities, listSpecialties, searchHospitals } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Find a Hospital",
   description:
-    "Browse accredited partner hospitals in Beijing, Shanghai, Guangzhou, and Xi'an by specialty and city.",
+    "Browse accredited partner hospitals in Beijing, Shanghai, Guangzhou, Xi'an, and beyond by specialty and city.",
 };
 
 export default async function HospitalsPage({
@@ -17,13 +16,22 @@ export default async function HospitalsPage({
   searchParams: Promise<{ city?: string; specialty?: string }>;
 }) {
   const params = await searchParams;
-  const { data: results } = await searchHospitals({ city: params.city, specialty: params.specialty });
+  const [cities, specialties, { data: results }] = await Promise.all([
+    listCities(),
+    listSpecialties(),
+    searchHospitals({ city: params.city, specialty: params.specialty }),
+  ]);
+
+  const cityNameBySlug = new Map(cities.map((c) => [c.slug, c.name]));
+  const specialtyNameBySlug = new Map(specialties.map((s) => [s.slug, s.name]));
 
   const cards = results.map((h) => ({
     slug: h.slug,
     name: h.name,
-    cityLabel: cities.find((c) => c.slug === h.citySlug)?.name ?? h.citySlug,
-    specialties: [] as string[],
+    cityLabel: cityNameBySlug.get(h.citySlug) ?? h.citySlug,
+    specialties: (h.specialtySlugs ?? [])
+      .slice(0, 2)
+      .map((slug) => specialtyNameBySlug.get(slug) ?? slug),
     rating: Number(h.rating),
     reviewCount: h.reviewCount,
   }));

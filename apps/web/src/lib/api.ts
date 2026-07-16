@@ -427,12 +427,16 @@ export function deleteDependent(accessToken: string, dependentId: string) {
 
 // --- Hospitals -----------------------------------------------------------
 
-export function searchHospitals(query: { city?: string; specialty?: string } = {}) {
+export function searchHospitals(query: { city?: string; specialty?: string; limit?: number } = {}) {
   return request<Paginated<Hospital>>("/hospitals", { query });
 }
 
 export function listSpecialties() {
   return request<Specialty[]>("/specialties");
+}
+
+export function listCities() {
+  return request<City[]>("/cities");
 }
 
 export function getHospital(hospitalId: string) {

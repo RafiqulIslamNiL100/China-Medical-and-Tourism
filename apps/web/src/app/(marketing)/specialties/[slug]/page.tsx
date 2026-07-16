@@ -2,11 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Container, PageHero } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
-import { specialties, hospitals } from "@/data/hospitals";
-
-export function generateStaticParams() {
-  return specialties.map((s) => ({ slug: s.slug }));
-}
+import { listSpecialties, listCities, searchHospitals } from "@/lib/api";
 
 export async function generateMetadata({
   params,
@@ -14,9 +10,10 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  const specialties = await listSpecialties();
   const specialty = specialties.find((s) => s.slug === slug);
   if (!specialty) return {};
-  return { title: specialty.name, description: specialty.blurb };
+  return { title: specialty.name, description: specialty.blurb ?? undefined };
 }
 
 const faqBySpecialty: Record<string, { q: string; a: string }[]> = {
@@ -64,25 +61,41 @@ export default async function SpecialtyDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const [specialties, cities, { data: hospitals }] = await Promise.all([
+    listSpecialties(),
+    listCities(),
+    searchHospitals({ specialty: slug, limit: 100 }),
+  ]);
   const specialty = specialties.find((s) => s.slug === slug);
   if (!specialty) notFound();
 
-  const matchingHospitals = hospitals.filter((h) =>
-    h.specialties.includes(specialty.name)
-  );
+  const specialtyNameBySlug = new Map(specialties.map((s) => [s.slug, s.name]));
+  const cityNameBySlug = new Map(cities.map((c) => [c.slug, c.name]));
+
+  const cards = hospitals.map((h) => ({
+    slug: h.slug,
+    name: h.name,
+    cityLabel: cityNameBySlug.get(h.citySlug) ?? h.citySlug,
+    specialties: (h.specialtySlugs ?? [])
+      .slice(0, 2)
+      .map((slug) => specialtyNameBySlug.get(slug) ?? slug),
+    rating: Number(h.rating),
+    reviewCount: h.reviewCount,
+  }));
+
   const faqs = faqBySpecialty[specialty.slug] ?? [];
 
   return (
     <>
-      <PageHero eyebrow="Specialty" title={specialty.name} description={specialty.blurb} />
+      <PageHero eyebrow="Specialty" title={specialty.name} description={specialty.blurb ?? undefined} />
       <Container className="flex flex-col gap-10 py-10">
         <section>
           <h2 className="mb-4 text-xl font-bold text-neutral-900">
             Hospitals offering {specialty.name}
           </h2>
-          {matchingHospitals.length > 0 ? (
+          {cards.length > 0 ? (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {matchingHospitals.map((h) => (
+              {cards.map((h) => (
                 <HospitalCard key={h.slug} hospital={h} />
               ))}
             </div>
