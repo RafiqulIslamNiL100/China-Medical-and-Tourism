@@ -401,10 +401,10 @@ async function main() {
   const michael = await createPatient("michael.asante@example.com", "Michael Asante", null, "Ghana");
   console.log("Seeded 4 patients (+1 dependent).");
 
-  // Case 1 — Amara — Accepted, Beijing United, Cardiology (CMT-2026-1042)
+  // Case 1 — Amara — Accepted, Beijing United, Cardiology (AHLT-2026-1042)
   const case1042 = await prisma.application.create({
     data: {
-      refNumber: "CMT-2026-1042",
+      refNumber: "AHLT-2026-1042",
       patientId: amara.patientProfile.id,
       hospitalId: beijingUnited.id,
       doctorId: doctor(beijingUnited, "li-wei").id,
@@ -477,10 +477,10 @@ async function main() {
     },
   });
 
-  // Case 2 — Amara — UnderReview, Shanghai East, Orthopedics (CMT-2026-0981)
+  // Case 2 — Amara — UnderReview, Shanghai East, Orthopedics (AHLT-2026-0981)
   await prisma.application.create({
     data: {
-      refNumber: "CMT-2026-0981",
+      refNumber: "AHLT-2026-0981",
       patientId: amara.patientProfile.id,
       hospitalId: shanghaiEast.id,
       doctorId: doctor(shanghaiEast, "wang-fang").id,
@@ -500,10 +500,10 @@ async function main() {
     },
   });
 
-  // Case 3 — Amara — Completed, Beijing United, Health Screening (CMT-2026-0754)
+  // Case 3 — Amara — Completed, Beijing United, Health Screening (AHLT-2026-0754)
   const case0754 = await prisma.application.create({
     data: {
-      refNumber: "CMT-2026-0754",
+      refNumber: "AHLT-2026-0754",
       patientId: amara.patientProfile.id,
       hospitalId: beijingUnited.id,
       doctorId: doctor(beijingUnited, "chen-min").id,
@@ -546,10 +546,10 @@ async function main() {
   });
   console.log("Seeded Amara Nwosu's 3 cases with documents, messages, invoices, transfer, interpreter session, hotel booking, and a review.");
 
-  // Case — Farrukh — Submitted, Beijing United, Cardiology (CMT-2026-2201)
+  // Case — Farrukh — Submitted, Beijing United, Cardiology (AHLT-2026-2201)
   await prisma.application.create({
     data: {
-      refNumber: "CMT-2026-2201",
+      refNumber: "AHLT-2026-2201",
       patientId: farrukh.patientProfile.id,
       hospitalId: beijingUnited.id,
       specialtySlug: "cardiology",
@@ -572,7 +572,7 @@ async function main() {
   // Cases — Grace — UnderReview (Health Screening) + Completed (Knee, for review)
   await prisma.application.create({
     data: {
-      refNumber: "CMT-2026-2198",
+      refNumber: "AHLT-2026-2198",
       patientId: grace.patientProfile.id,
       hospitalId: beijingUnited.id,
       specialtySlug: "health-screening",
@@ -588,7 +588,7 @@ async function main() {
 
   const graceKnee = await prisma.application.create({
     data: {
-      refNumber: "CMT-2026-1877",
+      refNumber: "AHLT-2026-1877",
       patientId: grace.patientProfile.id,
       hospitalId: shanghaiEast.id,
       doctorId: doctor(shanghaiEast, "wang-fang").id,
@@ -637,7 +637,7 @@ async function main() {
   // Cases — Michael — InfoRequested (Cardiology) + Completed (TCM, for review)
   await prisma.application.create({
     data: {
-      refNumber: "CMT-2026-2185",
+      refNumber: "AHLT-2026-2185",
       patientId: michael.patientProfile.id,
       hospitalId: beijingUnited.id,
       specialtySlug: "cardiology",
@@ -658,7 +658,7 @@ async function main() {
 
   const michaelTcm = await prisma.application.create({
     data: {
-      refNumber: "CMT-2026-1690",
+      refNumber: "AHLT-2026-1690",
       patientId: michael.patientProfile.id,
       hospitalId: guangzhouFirst.id,
       doctorId: doctor(guangzhouFirst, "liu-jing").id,
@@ -707,7 +707,7 @@ async function main() {
 
   await prisma.platformSetting.createMany({
     data: [
-      { key: "platform_name", value: "China Medical and Tourism" },
+      { key: "platform_name", value: "Asia Health Link and Travel" },
       { key: "support_email", value: "support@cmt-platform.com" },
       { key: "default_deposit_rate", value: 0.2 },
     ],

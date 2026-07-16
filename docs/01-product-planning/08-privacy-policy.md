@@ -11,7 +11,7 @@
 
 ## 1. Introduction
 
-China Medical and Tourism ("the Platform," "we," "us," "our") connects international
+Asia Health Link and Travel ("the Platform," "we," "us," "our") connects international
 patients with hospitals in China and coordinates related travel services. This Privacy
 Policy explains what personal information we collect, how we use it, who we share it with,
 and the choices you have.

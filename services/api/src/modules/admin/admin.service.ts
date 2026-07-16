@@ -102,7 +102,7 @@ export class AdminService {
 
     await this.notifications.notify({
       userId: created.id,
-      title: "You've been invited to China Medical and Tourism",
+      title: "You've been invited to Asia Health Link and Travel",
       body: `An account was created for you with role ${dto.role}. Use "Forgot password" with this email to set your own password.`,
       category: "staff_invited",
     });

@@ -1,4 +1,4 @@
-// China Medical and Tourism — Database Schema (Phase 6)
+// Asia Health Link and Travel — Database Schema (Phase 6)
 //
 // Implements the conventions fixed in docs/03-architecture/04-database-architecture.md:
 // module-owned tables, UUID primary keys, createdAt/updatedAt on every table, soft

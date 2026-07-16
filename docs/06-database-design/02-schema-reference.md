@@ -60,7 +60,7 @@ after diff instead of prose.
 
 ### `Application`
 The case-centric hub (§1 of the ERD doc). `refNumber` is the human-facing
-`CMT-YYYY-NNNN` identifier shown throughout the UI; `id` (UUID) is the internal key.
+`AHLT-YYYY-NNNN` identifier shown throughout the UI; `id` (UUID) is the internal key.
 `status` is the fixed six-value enum from `docs/PROJECT_CONTEXT.md` §10 — extend it
 deliberately, never introduce ad hoc values. `caseManagerUserId` is nullable because a
 case has no assigned case manager until FR-APP-05's auto-assignment fires on
@@ -99,7 +99,7 @@ already-issued letters.
 FR-HOTEL-01 through 05. A `HotelPartner` (the login/tenant) can own multiple `Hotel`
 properties — modeling a partner that manages several hotels under one account, not
 just a 1:1 partner-to-hotel assumption. `HotelBooking.applicationId` is nullable
-because a hotel can theoretically take bookings unrelated to a CMT case in a full
+because a hotel can theoretically take bookings unrelated to an Asia Health Link case in a full
 multi-sided marketplace, though the current product only exposes case-linked booking.
 
 ## Transport module

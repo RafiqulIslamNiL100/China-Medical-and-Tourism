@@ -36,7 +36,7 @@ export type OpsCase = {
 export const opsCases: OpsCase[] = [
   {
     id: "case-1042",
-    refNumber: "CMT-2026-1042",
+    refNumber: "AHLT-2026-1042",
     patientName: "Amara Nwosu",
     patientCountry: "Nigeria",
     hospitalName: "Beijing United Family Hospital",
@@ -59,7 +59,7 @@ export const opsCases: OpsCase[] = [
   },
   {
     id: "case-0981",
-    refNumber: "CMT-2026-0981",
+    refNumber: "AHLT-2026-0981",
     patientName: "Elena Kovalenko",
     patientCountry: "Kazakhstan",
     hospitalName: "Shanghai East Hospital",
@@ -73,7 +73,7 @@ export const opsCases: OpsCase[] = [
   },
   {
     id: "case-2201",
-    refNumber: "CMT-2026-2201",
+    refNumber: "AHLT-2026-2201",
     patientName: "Farrukh Tashkentov",
     patientCountry: "Uzbekistan",
     hospitalName: "Beijing United Family Hospital",
@@ -87,7 +87,7 @@ export const opsCases: OpsCase[] = [
   },
   {
     id: "case-2185",
-    refNumber: "CMT-2026-2185",
+    refNumber: "AHLT-2026-2185",
     patientName: "Michael Asante",
     patientCountry: "Ghana",
     hospitalName: "Beijing United Family Hospital",
@@ -107,7 +107,7 @@ export const opsCases: OpsCase[] = [
   },
   {
     id: "case-0754",
-    refNumber: "CMT-2026-0754",
+    refNumber: "AHLT-2026-0754",
     patientName: "Amara Nwosu",
     patientCountry: "Nigeria",
     hospitalName: "Beijing United Family Hospital",
@@ -138,7 +138,7 @@ export const assignmentBoard: AssignmentBoardItem[] = [
   {
     id: "asg-1",
     caseId: "case-1042",
-    caseRef: "CMT-2026-1042",
+    caseRef: "AHLT-2026-1042",
     patientName: "Amara Nwosu",
     type: "Driver",
     date: "2026-07-28",
@@ -148,7 +148,7 @@ export const assignmentBoard: AssignmentBoardItem[] = [
   {
     id: "asg-2",
     caseId: "case-1042",
-    caseRef: "CMT-2026-1042",
+    caseRef: "AHLT-2026-1042",
     patientName: "Amara Nwosu",
     type: "Interpreter",
     date: "2026-07-28",
@@ -158,7 +158,7 @@ export const assignmentBoard: AssignmentBoardItem[] = [
   {
     id: "asg-3",
     caseId: "case-0754",
-    caseRef: "CMT-2026-0754",
+    caseRef: "AHLT-2026-0754",
     patientName: "Amara Nwosu",
     type: "Driver",
     date: "2026-02-02",

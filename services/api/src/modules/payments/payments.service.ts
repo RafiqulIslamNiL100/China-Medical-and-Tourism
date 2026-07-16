@@ -109,7 +109,7 @@ export class PaymentsService {
       doc.on("end", () => resolve(Buffer.concat(chunks)));
       doc.on("error", reject);
 
-      doc.fontSize(20).text("China Medical and Tourism", { align: "left" });
+      doc.fontSize(20).text("Asia Health Link and Travel", { align: "left" });
       doc.fontSize(10).fillColor("#666666").text("Payment Receipt", { align: "left" });
       doc.moveDown(2);
 

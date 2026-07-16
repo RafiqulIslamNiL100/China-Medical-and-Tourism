@@ -116,7 +116,7 @@ export type Transaction = {
 };
 
 export const transactions: Transaction[] = [
-  { id: "tx-1", date: "2026-06-25", patientName: "Amara Nwosu", description: "Booking deposit — CMT-2026-1042", amountUsd: 3000, status: "Paid" },
+  { id: "tx-1", date: "2026-06-25", patientName: "Amara Nwosu", description: "Booking deposit — AHLT-2026-1042", amountUsd: 3000, status: "Paid" },
   { id: "tx-2", date: "2026-01-15", patientName: "Amara Nwosu", description: "Executive Health Screening — full payment", amountUsd: 1850, status: "Paid" },
   { id: "tx-3", date: "2026-05-30", patientName: "Priya S.", description: "Refund — hotel discrepancy goodwill credit", amountUsd: 200, status: "Refunded" },
 ];
@@ -130,10 +130,10 @@ export type CmsArticle = {
 };
 
 export const cmsArticles: CmsArticle[] = [
-  { id: "cms-1", title: "What to Pack for Your Medical Trip to China", status: "Published", author: "CMT Case Management Team", updatedDate: "2026-05-02" },
-  { id: "cms-2", title: "Understanding the Medical Visa Process for China", status: "Published", author: "CMT Case Management Team", updatedDate: "2026-04-18" },
-  { id: "cms-3", title: "Why More International Patients Are Choosing China for Cardiology Care", status: "Published", author: "CMT Editorial", updatedDate: "2026-03-27" },
-  { id: "cms-4", title: "A Guide to Recovery Nutrition After Surgery", status: "Draft", author: "CMT Editorial", updatedDate: "2026-07-10" },
+  { id: "cms-1", title: "What to Pack for Your Medical Trip to China", status: "Published", author: "Asia Health Link Case Management Team", updatedDate: "2026-05-02" },
+  { id: "cms-2", title: "Understanding the Medical Visa Process for China", status: "Published", author: "Asia Health Link Case Management Team", updatedDate: "2026-04-18" },
+  { id: "cms-3", title: "Why More International Patients Are Choosing China for Cardiology Care", status: "Published", author: "Asia Health Link Editorial", updatedDate: "2026-03-27" },
+  { id: "cms-4", title: "A Guide to Recovery Nutrition After Surgery", status: "Draft", author: "Asia Health Link Editorial", updatedDate: "2026-07-10" },
 ];
 
 export type AuditLogEntry = {
@@ -145,7 +145,7 @@ export type AuditLogEntry = {
 };
 
 export const auditLog: AuditLogEntry[] = [
-  { id: "log-1", actor: "Li Wei", action: "Document accessed", target: "Passport photo page — CMT-2026-1042", timestamp: "2026-07-12T09:14:00Z" },
+  { id: "log-1", actor: "Li Wei", action: "Document accessed", target: "Passport photo page — AHLT-2026-1042", timestamp: "2026-07-12T09:14:00Z" },
   { id: "log-2", actor: "Sarah Chen", action: "Role changed", target: "u-7 → Deactivated", timestamp: "2026-07-11T16:02:00Z" },
   { id: "log-3", actor: "Jing Zhao", action: "Listing change submitted", target: "Shanghai East Hospital — doctor profile", timestamp: "2026-07-09T11:47:00Z" },
   { id: "log-4", actor: "Sarah Chen", action: "Commission rate updated", target: "Beijing Riverside Suites → 15%", timestamp: "2026-07-05T14:30:00Z" },

@@ -3,13 +3,13 @@ import { Container, PageHero } from "@/components/Section";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "How China Medical and Tourism collects, uses, and protects your information.",
+  description: "How Asia Health Link and Travel collects, uses, and protects your information.",
 };
 
 const sections = [
   {
     title: "1. Introduction",
-    body: "China Medical and Tourism connects international patients with hospitals in China and coordinates related travel services. This Privacy Policy explains what personal information we collect, how we use it, who we share it with, and the choices you have. Because we process health-related information, a sensitive category of data, we apply heightened safeguards throughout.",
+    body: "Asia Health Link and Travel connects international patients with hospitals in China and coordinates related travel services. This Privacy Policy explains what personal information we collect, how we use it, who we share it with, and the choices you have. Because we process health-related information, a sensitive category of data, we apply heightened safeguards throughout.",
   },
   {
     title: "2. Information We Collect",

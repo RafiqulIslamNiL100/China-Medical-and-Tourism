@@ -1,10 +1,10 @@
 openapi: 3.0.3
 
 info:
-  title: China Medical and Tourism API
+  title: Asia Health Link and Travel API
   version: "1.0.0"
   description: >
-    REST API for the China Medical and Tourism platform. Implements the conventions
+    REST API for the Asia Health Link and Travel platform. Implements the conventions
     fixed in docs/03-architecture/03-backend-api-architecture.md and
     docs/PROJECT_CONTEXT.md §8: REST/JSON under /api/v1, bearer JWT auth,
     cursor-based pagination for high-growth lists, a consistent error shape, and
@@ -273,7 +273,7 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        refNumber: { type: string, example: "CMT-2026-1042" }
+        refNumber: { type: string, example: "AHLT-2026-1042" }
         patientId: { type: string, format: uuid }
         dependentId: { type: string, format: uuid, nullable: true }
         hospitalId: { type: string, format: uuid }

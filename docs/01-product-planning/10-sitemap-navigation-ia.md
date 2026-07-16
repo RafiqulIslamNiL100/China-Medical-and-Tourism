@@ -3,7 +3,7 @@
 ## 1. Site Map (Full Platform)
 
 ```
-China Medical and Tourism
+Asia Health Link and Travel
 │
 ├── Public / Marketing Site (unauthenticated)
 │   ├── / (Landing / Home)

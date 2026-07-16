@@ -84,7 +84,7 @@ export const dependents = [
 export const patientCases: PatientCase[] = [
   {
     id: "case-1042",
-    refNumber: "CMT-2026-1042",
+    refNumber: "AHLT-2026-1042",
     hospitalName: "Beijing United Family Hospital",
     hospitalSlug: "beijing-united-family-hospital",
     doctorName: "Dr. Li Wei",
@@ -155,7 +155,7 @@ export const patientCases: PatientCase[] = [
   },
   {
     id: "case-0981",
-    refNumber: "CMT-2026-0981",
+    refNumber: "AHLT-2026-0981",
     hospitalName: "Shanghai East Hospital",
     hospitalSlug: "shanghai-east-hospital",
     doctorName: "Dr. Wang Fang",
@@ -180,7 +180,7 @@ export const patientCases: PatientCase[] = [
   },
   {
     id: "case-0754",
-    refNumber: "CMT-2026-0754",
+    refNumber: "AHLT-2026-0754",
     hospitalName: "Beijing United Family Hospital",
     hospitalSlug: "beijing-united-family-hospital",
     doctorName: "Dr. Chen Min",
@@ -219,7 +219,7 @@ export const patientNotifications = [
   {
     id: "n-1",
     title: "Document requested",
-    body: "Please upload your passport photo page for case CMT-2026-1042.",
+    body: "Please upload your passport photo page for case AHLT-2026-1042.",
     date: "2026-07-08",
     read: false,
     href: "/app/cases/case-1042",
@@ -235,7 +235,7 @@ export const patientNotifications = [
   {
     id: "n-3",
     title: "Payment due soon",
-    body: "Treatment balance of $12,000 is due by 2026-07-20 for case CMT-2026-1042.",
+    body: "Treatment balance of $12,000 is due by 2026-07-20 for case AHLT-2026-1042.",
     date: "2026-07-06",
     read: false,
     href: "/app/cases/case-1042",

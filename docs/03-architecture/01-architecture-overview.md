@@ -1,7 +1,6 @@
 # System Architecture — Overview
 
-This document defines the target technical architecture for the China Medical and
-Tourism platform, confirming and expanding the stack proposed in
+This document defines the target technical architecture for the Asia Health Link and Travel platform, confirming and expanding the stack proposed in
 `docs/PROJECT_CONTEXT.md` §5. It is the entry point for the detailed architecture docs
 in this folder (frontend, backend, database, auth/security, storage/caching/search,
 notifications, observability, deployment/CI-CD).
