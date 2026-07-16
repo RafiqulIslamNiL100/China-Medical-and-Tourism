@@ -4,8 +4,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "China Medical and Tourism — Coordinated Treatment in China",
-    template: "%s — China Medical and Tourism",
+    default: "Asia Health Link & Travel — Coordinated Treatment & Visit in China",
+    template: "%s — Asia Health Link & Travel",
   },
   description:
     "Book world-class treatment at accredited hospitals in China, with visa support, hotel booking, and airport transfers coordinated in one place.",
