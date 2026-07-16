@@ -12,7 +12,7 @@ export function SimplePartnerHeader({
       <div className="mx-auto flex max-w-lg items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600 text-sm text-white">
-            CMT
+            AHL
           </span>
           <div>
             <p className="text-sm font-bold text-neutral-900">{title}</p>

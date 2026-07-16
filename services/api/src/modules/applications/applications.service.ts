@@ -407,7 +407,7 @@ export class ApplicationsService {
   private async generateRefNumber(): Promise<string> {
     const year = new Date().getFullYear();
     for (let attempt = 0; attempt < 5; attempt++) {
-      const candidate = `CMT-${year}-${randomInt(1000, 9999)}`;
+      const candidate = `AHLT-${year}-${randomInt(1000, 9999)}`;
       const exists = await this.prisma.application.findUnique({ where: { refNumber: candidate } });
       if (!exists) return candidate;
     }

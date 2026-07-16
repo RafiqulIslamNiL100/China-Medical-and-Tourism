@@ -8,6 +8,7 @@ import {
   ForgotPasswordDto,
   LoginDto,
   RefreshDto,
+  ResendVerificationDto,
   ResetPasswordDto,
   TwoFactorVerifyDto,
   VerifyDto,
@@ -31,6 +32,13 @@ export class AuthController {
   @Post("verify")
   verify(@Body() dto: VerifyDto) {
     return this.authService.verify(dto.userId, dto.code);
+  }
+
+  @Public()
+  @Post("resend-verification")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resendVerification(@Body() dto: ResendVerificationDto) {
+    await this.authService.resendVerification(dto.userId);
   }
 
   @Public()

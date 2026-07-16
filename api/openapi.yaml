@@ -1,10 +1,10 @@
 openapi: 3.0.3
 
 info:
-  title: China Medical and Tourism API
+  title: Asia Health Link & Travel API
   version: "1.0.0"
   description: >
-    REST API for the China Medical and Tourism platform. Implements the conventions
+    REST API for the Asia Health Link & Travel platform. Implements the conventions
     fixed in docs/03-architecture/03-backend-api-architecture.md and
     docs/PROJECT_CONTEXT.md §8: REST/JSON under /api/v1, bearer JWT auth,
     cursor-based pagination for high-growth lists, a consistent error shape, and
@@ -20,7 +20,7 @@ info:
     not a speculative superset.
 
 servers:
-  - url: https://api.cmt-platform.com/v1
+  - url: https://api.asiahealthlink.com/v1
     description: Production (illustrative — no real deployment exists yet)
   - url: http://localhost:3001/v1
     description: Local development
@@ -273,7 +273,7 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        refNumber: { type: string, example: "CMT-2026-1042" }
+        refNumber: { type: string, example: "AHLT-2026-1042" }
         patientId: { type: string, format: uuid }
         dependentId: { type: string, format: uuid, nullable: true }
         hospitalId: { type: string, format: uuid }
@@ -607,6 +607,25 @@ paths:
               schema: { $ref: "#/components/schemas/AuthTokens" }
         "400": { $ref: "#/components/responses/ValidationError" }
 
+  /auth/resend-verification:
+    post:
+      operationId: postAuthResendVerification
+      tags: [Auth]
+      summary: Re-send the OTP for an account that hasn't completed email verification (FR-AUTH-02)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string, format: uuid }
+      responses:
+        "204": { description: "A new code was sent." }
+        "409": { description: "Account is already verified — nothing to resend." }
+
   /auth/login:
     post:
       operationId: postAuthLogin
@@ -631,6 +650,8 @@ paths:
                       twoFactorRequired: { type: boolean }
                       challengeId: { type: string }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: "Credentials are correct but the account's email isn't verified yet (code EMAIL_NOT_VERIFIED). The error's `details.userId` can be passed to POST /auth/verify or /auth/resend-verification."
 
   /auth/2fa/verify:
     post:
@@ -2215,6 +2236,207 @@ paths:
                 rejectionReason: { type: string, description: "Required when approved=false" }
       responses:
         "200": { description: Resolved. }
+
+  /admin/hospitals:
+    get:
+      operationId: getAdminHospitals
+      tags: [Admin]
+      summary: List every hospital regardless of status (admin only) — used by the admin console's hospital management screen
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Hospital" }
+    post:
+      operationId: postAdminHospitals
+      tags: [Admin]
+      summary: Create a hospital listing directly (admin only) — bypasses the hospital_staff moderation queue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name, citySlug, description, priceTier, accreditations, languages, facilities]
+              properties:
+                slug: { type: string }
+                name: { type: string }
+                citySlug: { type: string }
+                description: { type: string }
+                priceTier: { type: string, example: "$$$" }
+                accreditations: { type: array, items: { type: string } }
+                languages: { type: array, items: { type: string } }
+                facilities: { type: array, items: { type: string } }
+                status: { type: string, enum: [Draft, PendingApproval, Published, Rejected], description: "Defaults to Published." }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Hospital" }
+
+  /admin/hospitals/{hospitalId}:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: patchAdminHospitalsByHospitalId
+      tags: [Admin]
+      summary: Directly update any field on a hospital, including status (admin only) — bypasses the moderation queue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                citySlug: { type: string }
+                priceTier: { type: string }
+                accreditations: { type: array, items: { type: string } }
+                languages: { type: array, items: { type: string } }
+                facilities: { type: array, items: { type: string } }
+                status: { type: string, enum: [Draft, PendingApproval, Published, Rejected] }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Hospital" }
+
+  /admin/hospitals/{hospitalId}/doctors:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postAdminHospitalsByHospitalIdDoctors
+      tags: [Admin]
+      summary: Add a doctor to any hospital (admin only) — bypasses the hospital_staff ownership check
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name, specialtySlug, credentials, yearsExperience, languages, bio]
+              properties:
+                slug: { type: string }
+                name: { type: string }
+                specialtySlug: { type: string }
+                credentials: { type: string }
+                yearsExperience: { type: integer, minimum: 0 }
+                languages: { type: array, items: { type: string } }
+                bio: { type: string }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Doctor" }
+
+  /admin/hospitals/{hospitalId}/doctors/{doctorId}:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: doctorId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: patchAdminHospitalsByHospitalIdDoctorsByDoctorId
+      tags: [Admin]
+      summary: Update a doctor's profile (admin only)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                specialtySlug: { type: string }
+                credentials: { type: string }
+                yearsExperience: { type: integer, minimum: 0 }
+                languages: { type: array, items: { type: string } }
+                bio: { type: string }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Doctor" }
+
+  /admin/hospitals/{hospitalId}/packages:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: postAdminHospitalsByHospitalIdPackages
+      tags: [Admin]
+      summary: Add a treatment package to any hospital (admin only) — bypasses the hospital_staff ownership check
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, specialtySlug, description, priceMinUsd, priceMaxUsd, includes]
+              properties:
+                name: { type: string }
+                specialtySlug: { type: string }
+                description: { type: string }
+                priceMinUsd: { type: number }
+                priceMaxUsd: { type: number }
+                includes: { type: array, items: { type: string } }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TreatmentPackage" }
+
+  /admin/hospitals/{hospitalId}/packages/{packageId}:
+    parameters:
+      - name: hospitalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: packageId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: patchAdminHospitalsByHospitalIdPackagesByPackageId
+      tags: [Admin]
+      summary: Update a treatment package (admin only)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                specialtySlug: { type: string }
+                description: { type: string }
+                priceMinUsd: { type: number }
+                priceMaxUsd: { type: number }
+                includes: { type: array, items: { type: string } }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TreatmentPackage" }
 
   /admin/audit-log:
     get:

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import * as argon2 from "argon2";
@@ -71,6 +71,16 @@ export class AuthService {
     return this.issueTokens(user.id, user.role);
   }
 
+  /** Re-sends the OTP for an account that hasn't completed email verification yet —
+   * the recovery path when the original email was lost, delayed, or never arrived. */
+  async resendVerification(userId: string) {
+    const user = await this.requireUser(userId);
+    if (user.emailVerifiedAt) {
+      throw AppException.conflict("ALREADY_VERIFIED", "This account is already verified.");
+    }
+    await this.issueOtp(user.id, VerificationCodePurpose.EmailVerification);
+  }
+
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findFirst({
       where: { OR: [{ email: dto.emailOrPhone }, { phone: dto.emailOrPhone }] },
@@ -82,6 +92,20 @@ export class AuthService {
     const valid = await argon2.verify(user.passwordHash, dto.password);
     if (!valid) {
       throw AppException.unauthenticated("Invalid credentials.");
+    }
+
+    // FR-AUTH-02: an account isn't usable until its email is verified. This is checked
+    // here (not just at registration) because it's the actual security boundary — a
+    // credential-holder with an unverified email must not receive tokens. `userId` is
+    // included in `details` so the client can jump straight into the verify flow
+    // (and call resend-verification) without another round trip.
+    if (!user.emailVerifiedAt) {
+      throw new AppException(
+        HttpStatus.FORBIDDEN,
+        "EMAIL_NOT_VERIFIED",
+        "Please verify your email before logging in.",
+        { userId: user.id },
+      );
     }
 
     if (user.twoFactorEnabled) {

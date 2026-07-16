@@ -44,7 +44,7 @@ async function bootstrap() {
   // healthy — this line makes that mismatch visible in the runtime logs immediately.
   // eslint-disable-next-line no-console
   console.log(
-    `CMT API listening on http://0.0.0.0:${port} (PORT env: ${process.env.PORT ?? "unset — defaulted to 3001"}). ` +
+    `Asia Health Link API listening on http://0.0.0.0:${port} (PORT env: ${process.env.PORT ?? "unset — defaulted to 3001"}). ` +
       `Ensure the platform's public domain targets this exact port.`,
   );
 }

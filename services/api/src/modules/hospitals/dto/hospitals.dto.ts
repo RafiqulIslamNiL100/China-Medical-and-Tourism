@@ -1,5 +1,8 @@
 import { Type } from "class-transformer";
-import { IsArray, IsInt, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
+import { HospitalListingStatus } from "@prisma/client";
+
+const HOSPITAL_STATUSES = Object.values(HospitalListingStatus);
 
 export class SearchHospitalsQuery {
   @IsOptional()
@@ -90,4 +93,131 @@ export class CreateTreatmentPackageDto {
   @IsArray()
   @IsString({ each: true })
   includes!: string[];
+}
+
+export class UpdateDoctorDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  specialtySlug?: string;
+
+  @IsOptional()
+  @IsString()
+  credentials?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  yearsExperience?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  languages?: string[];
+
+  @IsOptional()
+  @IsString()
+  bio?: string;
+}
+
+export class UpdatePackageDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  specialtySlug?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsNumber()
+  priceMinUsd?: number;
+
+  @IsOptional()
+  @IsNumber()
+  priceMaxUsd?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  includes?: string[];
+}
+
+/** Admin-only: creates a hospital directly (no moderation queue — admins are trusted). */
+export class CreateHospitalDto {
+  @IsString()
+  slug!: string;
+
+  @IsString()
+  name!: string;
+
+  @IsString()
+  citySlug!: string;
+
+  @IsString()
+  description!: string;
+
+  @IsString()
+  priceTier!: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  accreditations!: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  languages!: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  facilities!: string[];
+
+  @IsOptional()
+  @IsIn(HOSPITAL_STATUSES)
+  status?: HospitalListingStatus;
+}
+
+/** Admin-only: applies directly, bypassing the hospital_staff moderation-queue flow. */
+export class AdminUpdateHospitalDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  citySlug?: string;
+
+  @IsOptional()
+  @IsString()
+  priceTier?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  accreditations?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  languages?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  facilities?: string[];
+
+  @IsOptional()
+  @IsIn(HOSPITAL_STATUSES)
+  status?: HospitalListingStatus;
 }

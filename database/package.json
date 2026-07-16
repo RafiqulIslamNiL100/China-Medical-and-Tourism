@@ -2,7 +2,7 @@
   "name": "@cmt/database",
   "version": "0.1.0",
   "private": true,
-  "description": "Prisma schema and migrations for the China Medical and Tourism platform.",
+  "description": "Prisma schema and migrations for the Asia Health Link & Travel platform.",
   "scripts": {
     "validate": "prisma validate --schema=prisma/schema.prisma",
     "generate": "prisma generate --schema=prisma/schema.prisma",

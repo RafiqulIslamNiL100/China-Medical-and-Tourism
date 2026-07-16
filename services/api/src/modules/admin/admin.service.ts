@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import * as argon2 from "argon2";
 import { randomBytes } from "crypto";
-import { CaseStatus, UserRole, UserStatus } from "@prisma/client";
+import { CaseStatus, HospitalListingStatus, UserRole, UserStatus } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { NotificationService } from "../../common/notifications/notification.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -15,6 +15,14 @@ import {
   UpdateSettingDto,
   UpdateUserDto,
 } from "./dto/admin.dto";
+import {
+  AdminUpdateHospitalDto,
+  CreateDoctorDto,
+  CreateHospitalDto,
+  CreateTreatmentPackageDto,
+  UpdateDoctorDto,
+  UpdatePackageDto,
+} from "../hospitals/dto/hospitals.dto";
 
 const OPEN_STATUSES: CaseStatus[] = [
   CaseStatus.Submitted,
@@ -92,12 +100,17 @@ export class AdminService {
     const passwordHash = await argon2.hash(tempPassword);
 
     const created = await this.prisma.user.create({
-      data: { email: dto.email, passwordHash, role: dto.role },
+      // Admin-invited accounts skip self-service OTP verification — the admin entering
+      // this email address is itself the trust bootstrap, same as inviting a teammate
+      // in most SaaS products. Without this, invited staff could never log in: they
+      // get a "set your password" email, not an OTP, so login()'s emailVerifiedAt gate
+      // would lock them out permanently.
+      data: { email: dto.email, passwordHash, role: dto.role, emailVerifiedAt: new Date() },
     });
 
     await this.notifications.notify({
       userId: created.id,
-      title: "You've been invited to China Medical and Tourism",
+      title: "You've been invited to Asia Health Link & Travel",
       body: `An account was created for you with role ${dto.role}. Use "Forgot password" with this email to set your own password.`,
       category: "staff_invited",
     });
@@ -242,5 +255,169 @@ export class AdminService {
     });
 
     return updated;
+  }
+
+  // --- hospitals / doctors / packages (direct admin CRUD, bypasses the ---
+  // --- hospital_staff moderation-queue flow since admins are trusted) ---
+
+  async listAllHospitals() {
+    return this.prisma.hospital.findMany({ orderBy: { name: "asc" } });
+  }
+
+  async createHospital(admin: AuthenticatedUser, dto: CreateHospitalDto) {
+    const existing = await this.prisma.hospital.findUnique({ where: { slug: dto.slug } });
+    if (existing) throw AppException.conflict("SLUG_IN_USE", "A hospital with this slug already exists.");
+
+    const hospital = await this.prisma.hospital.create({
+      data: {
+        slug: dto.slug,
+        name: dto.name,
+        citySlug: dto.citySlug,
+        description: dto.description,
+        priceTier: dto.priceTier,
+        accreditations: dto.accreditations,
+        languages: dto.languages,
+        facilities: dto.facilities,
+        status: dto.status ?? HospitalListingStatus.Published,
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: admin.userId,
+      actorLabel: "Admin",
+      action: "hospital_created",
+      targetType: "Hospital",
+      targetId: hospital.id,
+      metadata: { slug: dto.slug },
+    });
+
+    return hospital;
+  }
+
+  async updateHospital(admin: AuthenticatedUser, hospitalId: string, dto: AdminUpdateHospitalDto) {
+    const hospital = await this.requireHospital(hospitalId);
+
+    const updated = await this.prisma.hospital.update({
+      where: { id: hospitalId },
+      data: {
+        name: dto.name ?? hospital.name,
+        description: dto.description ?? hospital.description,
+        citySlug: dto.citySlug ?? hospital.citySlug,
+        priceTier: dto.priceTier ?? hospital.priceTier,
+        accreditations: dto.accreditations ?? hospital.accreditations,
+        languages: dto.languages ?? hospital.languages,
+        facilities: dto.facilities ?? hospital.facilities,
+        status: dto.status ?? hospital.status,
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: admin.userId,
+      actorLabel: "Admin",
+      action: "hospital_updated",
+      targetType: "Hospital",
+      targetId: hospitalId,
+      metadata: { fields: Object.keys(dto) },
+    });
+
+    return updated;
+  }
+
+  async createDoctor(admin: AuthenticatedUser, hospitalId: string, dto: CreateDoctorDto) {
+    await this.requireHospital(hospitalId);
+    const doctor = await this.prisma.doctor.create({ data: { ...dto, hospitalId } });
+
+    await this.audit.record({
+      actorUserId: admin.userId,
+      actorLabel: "Admin",
+      action: "doctor_created",
+      targetType: "Doctor",
+      targetId: doctor.id,
+      metadata: { hospitalId },
+    });
+
+    return doctor;
+  }
+
+  async updateDoctor(admin: AuthenticatedUser, hospitalId: string, doctorId: string, dto: UpdateDoctorDto) {
+    const doctor = await this.prisma.doctor.findUnique({ where: { id: doctorId } });
+    if (!doctor || doctor.hospitalId !== hospitalId) {
+      throw AppException.notFound("DOCTOR_NOT_FOUND", "Doctor not found.");
+    }
+
+    const updated = await this.prisma.doctor.update({
+      where: { id: doctorId },
+      data: {
+        name: dto.name ?? doctor.name,
+        specialtySlug: dto.specialtySlug ?? doctor.specialtySlug,
+        credentials: dto.credentials ?? doctor.credentials,
+        yearsExperience: dto.yearsExperience ?? doctor.yearsExperience,
+        languages: dto.languages ?? doctor.languages,
+        bio: dto.bio ?? doctor.bio,
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: admin.userId,
+      actorLabel: "Admin",
+      action: "doctor_updated",
+      targetType: "Doctor",
+      targetId: doctorId,
+      metadata: { hospitalId },
+    });
+
+    return updated;
+  }
+
+  async createPackage(admin: AuthenticatedUser, hospitalId: string, dto: CreateTreatmentPackageDto) {
+    await this.requireHospital(hospitalId);
+    const pkg = await this.prisma.treatmentPackage.create({ data: { ...dto, hospitalId } });
+
+    await this.audit.record({
+      actorUserId: admin.userId,
+      actorLabel: "Admin",
+      action: "package_created",
+      targetType: "TreatmentPackage",
+      targetId: pkg.id,
+      metadata: { hospitalId },
+    });
+
+    return pkg;
+  }
+
+  async updatePackage(admin: AuthenticatedUser, hospitalId: string, packageId: string, dto: UpdatePackageDto) {
+    const pkg = await this.prisma.treatmentPackage.findUnique({ where: { id: packageId } });
+    if (!pkg || pkg.hospitalId !== hospitalId) {
+      throw AppException.notFound("PACKAGE_NOT_FOUND", "Treatment package not found.");
+    }
+
+    const updated = await this.prisma.treatmentPackage.update({
+      where: { id: packageId },
+      data: {
+        name: dto.name ?? pkg.name,
+        specialtySlug: dto.specialtySlug ?? pkg.specialtySlug,
+        description: dto.description ?? pkg.description,
+        priceMinUsd: dto.priceMinUsd ?? pkg.priceMinUsd,
+        priceMaxUsd: dto.priceMaxUsd ?? pkg.priceMaxUsd,
+        includes: dto.includes ?? pkg.includes,
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: admin.userId,
+      actorLabel: "Admin",
+      action: "package_updated",
+      targetType: "TreatmentPackage",
+      targetId: packageId,
+      metadata: { hospitalId },
+    });
+
+    return updated;
+  }
+
+  private async requireHospital(hospitalId: string) {
+    const hospital = await this.prisma.hospital.findUnique({ where: { id: hospitalId } });
+    if (!hospital) throw AppException.notFound("HOSPITAL_NOT_FOUND", "Hospital not found.");
+    return hospital;
   }
 }

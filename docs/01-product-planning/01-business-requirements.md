@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-**China Medical and Tourism** (working name: "CMT Platform") is a two-sided marketplace and
+**Asia Health Link & Travel** (working name: "AHLT Platform") is a two-sided marketplace and
 service platform that connects international patients with accredited hospitals and doctors
 in China, and bundles the medical journey with the logistics of travel: visa support, hotel
 booking, airport transfers, interpretation, and concierge care.

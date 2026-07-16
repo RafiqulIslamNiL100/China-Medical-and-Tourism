@@ -361,6 +361,10 @@ export function verifyEmail(input: { userId: string; code: string }) {
   return request<AuthTokens>("/auth/verify", { method: "POST", body: input });
 }
 
+export function resendVerification(userId: string) {
+  return request<void>("/auth/resend-verification", { method: "POST", body: { userId } });
+}
+
 export function login(input: { emailOrPhone: string; password: string }) {
   return request<AuthTokens | { challengeId: string; twoFactorRequired: true }>("/auth/login", {
     method: "POST",
@@ -792,6 +796,57 @@ export function listAllArticles(accessToken: string) {
 
 export function listAdminUsers(accessToken: string, query: { role?: Role; cursor?: string; limit?: number } = {}) {
   return request<Paginated<User>>("/admin/users", { accessToken, query });
+}
+
+// --- Admin: hospitals / doctors / packages (direct CRUD, no moderation queue) ------------------
+
+export function listAllHospitalsAdmin(accessToken: string) {
+  return request<Hospital[]>("/admin/hospitals", { accessToken });
+}
+
+export function createHospital(
+  accessToken: string,
+  input: {
+    slug: string;
+    name: string;
+    citySlug: string;
+    description: string;
+    priceTier: string;
+    accreditations: string[];
+    languages: string[];
+    facilities: string[];
+    status?: string;
+  },
+) {
+  return request<Hospital>("/admin/hospitals", { method: "POST", body: input, accessToken });
+}
+
+export function adminUpdateHospital(accessToken: string, hospitalId: string, input: Record<string, unknown>) {
+  return request<Hospital>(`/admin/hospitals/${hospitalId}`, { method: "PATCH", body: input, accessToken });
+}
+
+export function adminCreateDoctor(
+  accessToken: string,
+  hospitalId: string,
+  input: { slug: string; name: string; specialtySlug: string; credentials: string; yearsExperience: number; languages: string[]; bio: string },
+) {
+  return request<Doctor>(`/admin/hospitals/${hospitalId}/doctors`, { method: "POST", body: input, accessToken });
+}
+
+export function adminUpdateDoctor(accessToken: string, hospitalId: string, doctorId: string, input: Record<string, unknown>) {
+  return request<Doctor>(`/admin/hospitals/${hospitalId}/doctors/${doctorId}`, { method: "PATCH", body: input, accessToken });
+}
+
+export function adminCreatePackage(
+  accessToken: string,
+  hospitalId: string,
+  input: { name: string; specialtySlug: string; description: string; priceMinUsd: number; priceMaxUsd: number; includes: string[] },
+) {
+  return request<TreatmentPackage>(`/admin/hospitals/${hospitalId}/packages`, { method: "POST", body: input, accessToken });
+}
+
+export function adminUpdatePackage(accessToken: string, hospitalId: string, packageId: string, input: Record<string, unknown>) {
+  return request<TreatmentPackage>(`/admin/hospitals/${hospitalId}/packages/${packageId}`, { method: "PATCH", body: input, accessToken });
 }
 
 export function inviteUser(accessToken: string, email: string, role: Role) {

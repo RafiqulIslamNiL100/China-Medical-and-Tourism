@@ -12,7 +12,7 @@ export default function AboutPage() {
       <PageHero
         eyebrow="About Us"
         title="A single point of accountability for international medical travel"
-        description="We started China Medical and Tourism because patients deserved better than fragmented, unlicensed 'medical broker' arrangements."
+        description="We started Asia Health Link & Travel because patients deserved better than fragmented, unlicensed 'medical broker' arrangements."
       />
       <Container className="flex flex-col gap-10 py-10">
         <section>

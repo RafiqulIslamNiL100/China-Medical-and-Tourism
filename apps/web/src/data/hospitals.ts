@@ -323,7 +323,7 @@ export const blogPosts: BlogPost[] = [
     excerpt:
       "A practical checklist for international patients — from documents to comfort items for your recovery stay.",
     category: "Travel Prep",
-    author: "CMT Case Management Team",
+    author: "Asia Health Link Case Management Team",
     date: "2026-05-02",
     readTime: "6 min read",
     body: [
@@ -338,7 +338,7 @@ export const blogPosts: BlogPost[] = [
     excerpt:
       "What an invitation letter actually does, how long approval typically takes, and how to avoid common delays.",
     category: "Visa & Documentation",
-    author: "CMT Case Management Team",
+    author: "Asia Health Link Case Management Team",
     date: "2026-04-18",
     readTime: "8 min read",
     body: [
@@ -353,7 +353,7 @@ export const blogPosts: BlogPost[] = [
     excerpt:
       "Advanced interventional techniques, shorter wait times, and significant cost savings versus Western alternatives.",
     category: "Treatment Insights",
-    author: "CMT Editorial",
+    author: "Asia Health Link Editorial",
     date: "2026-03-27",
     readTime: "5 min read",
     body: [

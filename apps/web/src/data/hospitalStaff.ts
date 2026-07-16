@@ -24,7 +24,7 @@ export type IncomingApplication = {
 export const incomingApplications: IncomingApplication[] = [
   {
     id: "app-2201",
-    refNumber: "CMT-2026-2201",
+    refNumber: "AHLT-2026-2201",
     patientName: "Farrukh Tashkentov",
     patientCountry: "Uzbekistan",
     specialty: "Cardiology",
@@ -44,7 +44,7 @@ export const incomingApplications: IncomingApplication[] = [
   },
   {
     id: "app-2198",
-    refNumber: "CMT-2026-2198",
+    refNumber: "AHLT-2026-2198",
     patientName: "Grace Otieno",
     patientCountry: "Kenya",
     specialty: "Health Screening",
@@ -60,7 +60,7 @@ export const incomingApplications: IncomingApplication[] = [
   },
   {
     id: "app-2185",
-    refNumber: "CMT-2026-2185",
+    refNumber: "AHLT-2026-2185",
     patientName: "Michael Asante",
     patientCountry: "Ghana",
     specialty: "Cardiology",
@@ -76,7 +76,7 @@ export const incomingApplications: IncomingApplication[] = [
   },
   {
     id: "app-2140",
-    refNumber: "CMT-2026-2140",
+    refNumber: "AHLT-2026-2140",
     patientName: "Amara Nwosu",
     patientCountry: "Nigeria",
     specialty: "Cardiology",
