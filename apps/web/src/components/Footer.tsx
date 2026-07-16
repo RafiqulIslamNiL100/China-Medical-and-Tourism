@@ -63,7 +63,7 @@ export function Footer() {
         </div>
         <div className="mt-10 flex flex-col items-start justify-between gap-4 border-t border-neutral-300/70 pt-6 text-xs text-neutral-500 sm:flex-row sm:items-center">
           <p>
-            &copy; {new Date().getFullYear()} China Medical and Tourism. All rights
+            &copy; {new Date().getFullYear()} Asia Health Link &amp; Travel. All rights
             reserved.
           </p>
           <p>Medical treatment is provided solely by independent, licensed partner hospitals.</p>
