@@ -6,6 +6,7 @@ import {
   CreateDoctorDto,
   CreateTreatmentPackageDto,
   SearchHospitalsQuery,
+  SearchTreatmentsQuery,
   SubmitHospitalChangeDto,
 } from "./dto/hospitals.dto";
 
@@ -39,6 +40,31 @@ export class HospitalsService {
 
     const hasMore = hospitals.length > take;
     const data = hasMore ? hospitals.slice(0, take) : hospitals;
+    return { data, meta: { nextCursor: hasMore ? data[data.length - 1].id : null, hasMore } };
+  }
+
+  /** Cross-hospital treatment search — homepage "Explore Treatments" and the /treatments page. */
+  async searchTreatments(query: SearchTreatmentsQuery) {
+    const where: Prisma.TreatmentPackageWhereInput = {
+      hospital: {
+        status: HospitalListingStatus.Published,
+        ...(query.city ? { citySlug: query.city } : {}),
+      },
+      ...(query.specialty ? { specialtySlug: query.specialty } : {}),
+      ...(query.search ? { name: { contains: query.search, mode: "insensitive" } } : {}),
+    };
+
+    const take = query.limit ?? 20;
+    const packages = await this.prisma.treatmentPackage.findMany({
+      where,
+      take: take + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      orderBy: { name: "asc" },
+      include: { hospital: { select: { name: true, slug: true, citySlug: true } } },
+    });
+
+    const hasMore = packages.length > take;
+    const data = hasMore ? packages.slice(0, take) : packages;
     return { data, meta: { nextCursor: hasMore ? data[data.length - 1].id : null, hasMore } };
   }
 
