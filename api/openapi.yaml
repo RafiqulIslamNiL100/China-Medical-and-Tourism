@@ -227,6 +227,14 @@ components:
         dateOfBirth: { type: string, format: date }
         createdAt: { type: string, format: date-time }
 
+    City:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        tagline: { type: string, nullable: true }
+        climate: { type: string, nullable: true }
+
     Hospital:
       type: object
       properties:
@@ -235,6 +243,10 @@ components:
         name: { type: string }
         citySlug: { type: string }
         description: { type: string }
+        richProfileMarkdown:
+          type: string
+          nullable: true
+          description: Optional long-form profile in GFM Markdown (headings, tables, lists) for hospitals with detailed department directories, key-discipline rosters, etc.
         priceTier: { type: string, enum: ["$$", "$$$", "$$$$"] }
         accreditations: { type: array, items: { type: string } }
         languages: { type: array, items: { type: string } }
@@ -2237,6 +2249,42 @@ paths:
       responses:
         "200": { description: Resolved. }
 
+  /admin/cities:
+    get:
+      operationId: getAdminCities
+      tags: [Admin]
+      summary: List every city (admin only)
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/City" }
+    post:
+      operationId: postAdminCities
+      tags: [Admin]
+      summary: Create a city (admin only) — required before a hospital can be listed in it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name]
+              properties:
+                slug: { type: string }
+                name: { type: string }
+                tagline: { type: string }
+                climate: { type: string }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/City" }
+
   /admin/hospitals:
     get:
       operationId: getAdminHospitals
@@ -2266,6 +2314,7 @@ paths:
                 name: { type: string }
                 citySlug: { type: string }
                 description: { type: string }
+                richProfileMarkdown: { type: string, description: "Optional long-form profile in GFM Markdown." }
                 priceTier: { type: string, example: "$$$" }
                 accreditations: { type: array, items: { type: string } }
                 languages: { type: array, items: { type: string } }
@@ -2296,6 +2345,7 @@ paths:
               properties:
                 name: { type: string }
                 description: { type: string }
+                richProfileMarkdown: { type: string, description: "Optional long-form profile in GFM Markdown." }
                 citySlug: { type: string }
                 priceTier: { type: string }
                 accreditations: { type: array, items: { type: string } }

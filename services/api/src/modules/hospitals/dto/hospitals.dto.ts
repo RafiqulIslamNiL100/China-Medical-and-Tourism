@@ -164,6 +164,10 @@ export class CreateHospitalDto {
   @IsString()
   description!: string;
 
+  @IsOptional()
+  @IsString()
+  richProfileMarkdown?: string;
+
   @IsString()
   priceTier!: string;
 
@@ -193,6 +197,10 @@ export class AdminUpdateHospitalDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  richProfileMarkdown?: string;
 
   @IsOptional()
   @IsString()

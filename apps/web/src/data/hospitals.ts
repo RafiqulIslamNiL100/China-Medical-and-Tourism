@@ -95,6 +95,12 @@ export const cities = [
     tagline: "A gateway city with excellent TCM integration and growing specialist capacity.",
     climate: "Humid subtropical — warm year-round, wettest in summer.",
   },
+  {
+    slug: "xi-an",
+    name: "Xi'an",
+    tagline: "A major regional medical center in Northwest China, home to leading transplant and oncology programs.",
+    climate: "Semi-arid continental — hot summers, cold dry winters. Best visited spring or autumn.",
+  },
 ] as const;
 
 export const hospitals: Hospital[] = [

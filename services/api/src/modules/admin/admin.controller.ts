@@ -4,6 +4,7 @@ import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-
 import { UserRole } from "@prisma/client";
 import { AdminService } from "./admin.service";
 import {
+  CreateCityDto,
   InviteUserDto,
   ListAuditLogQuery,
   ListUsersQuery,
@@ -77,6 +78,18 @@ export class AdminController {
   @Put("settings")
   updateSetting(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateSettingDto) {
     return this.adminService.updateSetting(user, dto);
+  }
+
+  // --- cities -----------------------------------------------------------------
+
+  @Get("cities")
+  listCities() {
+    return this.adminService.listCities();
+  }
+
+  @Post("cities")
+  createCity(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateCityDto) {
+    return this.adminService.createCity(user, dto);
   }
 
   // --- hospitals / doctors / packages: direct admin CRUD, bypassing the ---

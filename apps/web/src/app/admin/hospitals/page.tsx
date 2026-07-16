@@ -5,7 +5,7 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/auth-client";
 import { fmtDate } from "@/lib/portal";
-import { cities, specialties } from "@/data/hospitals";
+import { specialties } from "@/data/hospitals";
 import {
   listModerationQueue,
   resolveModerationItem,
@@ -16,11 +16,14 @@ import {
   adminCreateDoctor,
   listPackages,
   adminCreatePackage,
+  listCitiesAdmin,
+  createCity,
   ApiError,
   type ModerationItem,
   type Hospital,
   type Doctor,
   type TreatmentPackage,
+  type City,
 } from "@/lib/api";
 
 const STATUSES = ["Draft", "PendingApproval", "Published", "Rejected"] as const;
@@ -31,12 +34,17 @@ type HospitalFormState = {
   name: string;
   citySlug: string;
   description: string;
+  richProfileMarkdown: string;
   priceTier: string;
   accreditations: string;
   languages: string;
   facilities: string;
   status: (typeof STATUSES)[number];
 };
+
+type CityFormState = { slug: string; name: string; tagline: string; climate: string };
+
+const emptyCityForm: CityFormState = { slug: "", name: "", tagline: "", climate: "" };
 
 type DoctorFormState = {
   slug: string;
@@ -60,8 +68,9 @@ type PackageFormState = {
 const emptyHospitalForm: HospitalFormState = {
   slug: "",
   name: "",
-  citySlug: cities[0].slug,
+  citySlug: "",
   description: "",
+  richProfileMarkdown: "",
   priceTier: "$$$",
   accreditations: "",
   languages: "",
@@ -105,6 +114,10 @@ export default function AdminHospitalModerationPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
+  const [cities, setCities] = useState<City[]>([]);
+  const [creatingCity, setCreatingCity] = useState(false);
+  const [cityForm, setCityForm] = useState<CityFormState>(emptyCityForm);
+
   const [creatingHospital, setCreatingHospital] = useState(false);
   const [hospitalForm, setHospitalForm] = useState<HospitalFormState>(emptyHospitalForm);
   const [expandedHospitalId, setExpandedHospitalId] = useState<string | null>(null);
@@ -122,9 +135,11 @@ export default function AdminHospitalModerationPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    Promise.all([listModerationQueue(accessToken), refreshHospitals(accessToken)])
-      .then(([queue]) => {
+    Promise.all([listModerationQueue(accessToken), refreshHospitals(accessToken), listCitiesAdmin(accessToken)])
+      .then(([queue, , cityList]) => {
         setItems(queue.filter((i) => !i.resolvedAt));
+        setCities(cityList);
+        setHospitalForm((f) => (f.citySlug ? f : { ...f, citySlug: cityList[0]?.slug ?? "" }));
       })
       .finally(() => setLoading(false));
   }, [accessToken]);
@@ -155,6 +170,26 @@ export default function AdminHospitalModerationPage() {
     }
   }
 
+  async function handleCreateCity(e: React.FormEvent) {
+    e.preventDefault();
+    if (!accessToken) return;
+    setError(null);
+    try {
+      const created = await createCity(accessToken, {
+        slug: cityForm.slug,
+        name: cityForm.name,
+        tagline: cityForm.tagline || undefined,
+        climate: cityForm.climate || undefined,
+      });
+      setCities((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setHospitalForm((f) => (f.citySlug ? f : { ...f, citySlug: created.slug }));
+      setCityForm(emptyCityForm);
+      setCreatingCity(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not create city.");
+    }
+  }
+
   async function handleCreateHospital(e: React.FormEvent) {
     e.preventDefault();
     if (!accessToken) return;
@@ -165,6 +200,7 @@ export default function AdminHospitalModerationPage() {
         name: hospitalForm.name,
         citySlug: hospitalForm.citySlug,
         description: hospitalForm.description,
+        richProfileMarkdown: hospitalForm.richProfileMarkdown || undefined,
         priceTier: hospitalForm.priceTier,
         accreditations: splitList(hospitalForm.accreditations),
         languages: splitList(hospitalForm.languages),
@@ -191,6 +227,7 @@ export default function AdminHospitalModerationPage() {
       name: hospital.name,
       citySlug: hospital.citySlug,
       description: hospital.description,
+      richProfileMarkdown: hospital.richProfileMarkdown ?? "",
       priceTier: hospital.priceTier,
       accreditations: hospital.accreditations.join(", "),
       languages: hospital.languages.join(", "),
@@ -216,6 +253,7 @@ export default function AdminHospitalModerationPage() {
       const updated = await adminUpdateHospital(accessToken, hospitalId, {
         name: editForm.name,
         description: editForm.description,
+        richProfileMarkdown: editForm.richProfileMarkdown,
         citySlug: editForm.citySlug,
         priceTier: editForm.priceTier,
         accreditations: splitList(editForm.accreditations),
@@ -285,10 +323,25 @@ export default function AdminHospitalModerationPage() {
             <h1 className="text-2xl font-bold text-neutral-900">Hospitals</h1>
             <p className="text-sm text-neutral-500">Create listings directly, edit any field, and manage doctors and treatment packages.</p>
           </div>
-          <Button size="sm" onClick={() => setCreatingHospital((v) => !v)}>
-            {creatingHospital ? "Cancel" : "New Hospital"}
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setCreatingCity((v) => !v)}>
+              {creatingCity ? "Cancel" : "New City"}
+            </Button>
+            <Button size="sm" onClick={() => setCreatingHospital((v) => !v)}>
+              {creatingHospital ? "Cancel" : "New Hospital"}
+            </Button>
+          </div>
         </div>
+
+        {creatingCity ? (
+          <form onSubmit={handleCreateCity} className="grid gap-3 rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm sm:grid-cols-2">
+            <input required placeholder="Slug (e.g. xi-an)" value={cityForm.slug} onChange={(e) => setCityForm((f) => ({ ...f, slug: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+            <input required placeholder="Name (e.g. Xi'an)" value={cityForm.name} onChange={(e) => setCityForm((f) => ({ ...f, name: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+            <input placeholder="Tagline (optional)" value={cityForm.tagline} onChange={(e) => setCityForm((f) => ({ ...f, tagline: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+            <input placeholder="Climate (optional)" value={cityForm.climate} onChange={(e) => setCityForm((f) => ({ ...f, climate: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+            <Button type="submit" size="sm" className="w-fit sm:col-span-2">Create City</Button>
+          </form>
+        ) : null}
 
         {creatingHospital ? (
           <form onSubmit={handleCreateHospital} className="grid gap-3 rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm sm:grid-cols-2">
@@ -304,7 +357,13 @@ export default function AdminHospitalModerationPage() {
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
-            <textarea required placeholder="Description" rows={3} value={hospitalForm.description} onChange={(e) => setHospitalForm((f) => ({ ...f, description: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2" />
+            <textarea required placeholder="Description (short summary shown at the top of the profile)" rows={3} value={hospitalForm.description} onChange={(e) => setHospitalForm((f) => ({ ...f, description: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2" />
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-semibold text-neutral-500">
+                Full Profile (optional — Markdown, supports tables via GFM: | Col | Col |)
+              </label>
+              <textarea placeholder="## Section heading&#10;&#10;| Department | Notes |&#10;|---|---|&#10;| Cardiology | ... |" rows={10} value={hospitalForm.richProfileMarkdown} onChange={(e) => setHospitalForm((f) => ({ ...f, richProfileMarkdown: e.target.value }))} className="w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs" />
+            </div>
             <input placeholder="Accreditations (comma-separated)" value={hospitalForm.accreditations} onChange={(e) => setHospitalForm((f) => ({ ...f, accreditations: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
             <input placeholder="Languages (comma-separated)" value={hospitalForm.languages} onChange={(e) => setHospitalForm((f) => ({ ...f, languages: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
             <input placeholder="Facilities (comma-separated)" value={hospitalForm.facilities} onChange={(e) => setHospitalForm((f) => ({ ...f, facilities: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2" />
@@ -352,6 +411,12 @@ export default function AdminHospitalModerationPage() {
                       ))}
                     </select>
                     <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm((f) => f && { ...f, description: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2" placeholder="Description" />
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs font-semibold text-neutral-500">
+                        Full Profile (optional — Markdown, supports tables via GFM)
+                      </label>
+                      <textarea rows={10} value={editForm.richProfileMarkdown} onChange={(e) => setEditForm((f) => f && { ...f, richProfileMarkdown: e.target.value })} className="w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs" />
+                    </div>
                     <input value={editForm.accreditations} onChange={(e) => setEditForm((f) => f && { ...f, accreditations: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" placeholder="Accreditations (comma-separated)" />
                     <input value={editForm.languages} onChange={(e) => setEditForm((f) => f && { ...f, languages: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" placeholder="Languages (comma-separated)" />
                     <input value={editForm.facilities} onChange={(e) => setEditForm((f) => f && { ...f, facilities: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2" placeholder="Facilities (comma-separated)" />

@@ -8,6 +8,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { AppException } from "../../common/filters/app-exception";
 import { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import {
+  CreateCityDto,
   InviteUserDto,
   ListAuditLogQuery,
   ListUsersQuery,
@@ -257,6 +258,32 @@ export class AdminService {
     return updated;
   }
 
+  // --- cities -----------------------------------------------------------------
+
+  async listCities() {
+    return this.prisma.city.findMany({ orderBy: { name: "asc" } });
+  }
+
+  async createCity(admin: AuthenticatedUser, dto: CreateCityDto) {
+    const existing = await this.prisma.city.findUnique({ where: { slug: dto.slug } });
+    if (existing) throw AppException.conflict("SLUG_IN_USE", "A city with this slug already exists.");
+
+    const city = await this.prisma.city.create({
+      data: { slug: dto.slug, name: dto.name, tagline: dto.tagline, climate: dto.climate },
+    });
+
+    await this.audit.record({
+      actorUserId: admin.userId,
+      actorLabel: "Admin",
+      action: "city_created",
+      targetType: "City",
+      targetId: city.slug,
+      metadata: { name: dto.name },
+    });
+
+    return city;
+  }
+
   // --- hospitals / doctors / packages (direct admin CRUD, bypasses the ---
   // --- hospital_staff moderation-queue flow since admins are trusted) ---
 
@@ -274,6 +301,7 @@ export class AdminService {
         name: dto.name,
         citySlug: dto.citySlug,
         description: dto.description,
+        richProfileMarkdown: dto.richProfileMarkdown,
         priceTier: dto.priceTier,
         accreditations: dto.accreditations,
         languages: dto.languages,
@@ -302,6 +330,7 @@ export class AdminService {
       data: {
         name: dto.name ?? hospital.name,
         description: dto.description ?? hospital.description,
+        richProfileMarkdown: dto.richProfileMarkdown ?? hospital.richProfileMarkdown,
         citySlug: dto.citySlug ?? hospital.citySlug,
         priceTier: dto.priceTier ?? hospital.priceTier,
         accreditations: dto.accreditations ?? hospital.accreditations,
