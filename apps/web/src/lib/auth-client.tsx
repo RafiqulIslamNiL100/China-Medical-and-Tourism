@@ -98,9 +98,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    const stored = readStoredAuth();
     writeStoredAuth(null);
     setAccessToken(null);
     setUser(null);
+    // Revoke server-side too, so the refresh token can't be used again if it ever
+    // leaked. Best-effort — clearing local state above is what actually signs the
+    // user out on this device, regardless of whether this call succeeds.
+    if (stored) {
+      api.logout(stored.accessToken, stored.refreshToken).catch(() => {});
+    }
   }, []);
 
   return (
