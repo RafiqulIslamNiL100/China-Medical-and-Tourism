@@ -2,7 +2,11 @@ import { Body, Controller, Get, Param, Post, UploadedFile, UseInterceptors } fro
 import { FileInterceptor } from "@nestjs/platform-express";
 import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { DocumentsService } from "./documents.service";
-import { VerifyDocumentDto } from "./dto/documents.dto";
+import { CreateApplicationDocumentDto, VerifyDocumentDto } from "./dto/documents.dto";
+
+// Multer-level cap, enforced before the file ever reaches DocumentsService's own
+// mime-type/size validation — defense in depth against oversized request bodies.
+const MULTER_FILE_SIZE_LIMIT_BYTES = 15 * 1024 * 1024;
 
 @Controller("applications/:applicationId")
 export class DocumentsController {
@@ -13,8 +17,19 @@ export class DocumentsController {
     return this.documentsService.listChecklist(user, applicationId);
   }
 
+  @Post("documents")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MULTER_FILE_SIZE_LIMIT_BYTES } }))
+  createAndUpload(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("applicationId") applicationId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: CreateApplicationDocumentDto,
+  ) {
+    return this.documentsService.createAndUpload(user, applicationId, file, dto);
+  }
+
   @Post("documents/:documentId/upload")
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MULTER_FILE_SIZE_LIMIT_BYTES } }))
   upload(
     @CurrentUser() user: AuthenticatedUser,
     @Param("applicationId") applicationId: string,

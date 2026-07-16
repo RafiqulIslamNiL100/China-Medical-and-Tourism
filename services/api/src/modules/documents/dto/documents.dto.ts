@@ -1,4 +1,5 @@
-import { IsBoolean, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsEnum, IsOptional, IsString } from "class-validator";
+import { DocumentCategory } from "@prisma/client";
 
 export class VerifyDocumentDto {
   @IsBoolean()
@@ -7,4 +8,14 @@ export class VerifyDocumentDto {
   @IsOptional()
   @IsString()
   note?: string;
+}
+
+export class CreateApplicationDocumentDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsEnum(DocumentCategory)
+  category?: DocumentCategory;
 }

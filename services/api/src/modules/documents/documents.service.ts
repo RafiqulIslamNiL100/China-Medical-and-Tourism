@@ -1,11 +1,21 @@
 import { Injectable, StreamableFile } from "@nestjs/common";
-import { DocumentStatus, InvoiceStatus, UserRole } from "@prisma/client";
+import { DocumentCategory, DocumentStatus, InvoiceStatus, UserRole } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { StorageService } from "../../common/storage/storage.service";
 import { NotificationService } from "../../common/notifications/notification.service";
 import { AppException } from "../../common/filters/app-exception";
 import { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
-import { VerifyDocumentDto } from "./dto/documents.dto";
+import { CreateApplicationDocumentDto, VerifyDocumentDto } from "./dto/documents.dto";
+
+// Matches the file types the patient application wizard's document uploader advertises.
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/png",
+  "image/jpeg",
+]);
+const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB — generous for scanned medical records
 
 @Injectable()
 export class DocumentsService {
@@ -27,8 +37,7 @@ export class DocumentsService {
   async upload(user: AuthenticatedUser, applicationId: string, documentId: string, file: Express.Multer.File) {
     await this.requireAccess(user, applicationId);
     const item = await this.requireItem(applicationId, documentId);
-
-    if (!file) throw AppException.validation("A file is required.");
+    this.validateFile(file);
 
     const key = await this.storage.save(file.originalname, file.buffer);
     const updated = await this.prisma.documentChecklistItem.update({
@@ -36,6 +45,35 @@ export class DocumentsService {
       data: { status: DocumentStatus.Uploaded, fileStorageKey: key, uploadedAt: new Date() },
     });
     return this.withDownloadUrl(updated);
+  }
+
+  /**
+   * Ad-hoc document upload: creates its own checklist item rather than filling in one
+   * of the 3 items seeded on hospital/case-manager acceptance. Used by the patient
+   * application wizard's Documents step, where no acceptance checklist exists yet
+   * because the application itself is still being created.
+   */
+  async createAndUpload(
+    user: AuthenticatedUser,
+    applicationId: string,
+    file: Express.Multer.File,
+    dto: CreateApplicationDocumentDto,
+  ) {
+    await this.requireAccess(user, applicationId);
+    this.validateFile(file);
+
+    const key = await this.storage.save(file.originalname, file.buffer);
+    const created = await this.prisma.documentChecklistItem.create({
+      data: {
+        applicationId,
+        name: dto.name || file.originalname,
+        category: dto.category ?? DocumentCategory.MedicalRecords,
+        status: DocumentStatus.Uploaded,
+        fileStorageKey: key,
+        uploadedAt: new Date(),
+      },
+    });
+    return this.withDownloadUrl(created);
   }
 
   async downloadFile(key: string): Promise<StreamableFile> {
@@ -172,5 +210,15 @@ export class DocumentsService {
 
   private requireRole(user: AuthenticatedUser, roles: UserRole[]) {
     if (!roles.includes(user.role)) throw AppException.forbidden();
+  }
+
+  private validateFile(file: Express.Multer.File | undefined): asserts file is Express.Multer.File {
+    if (!file) throw AppException.validation("A file is required.");
+    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      throw AppException.validation("Unsupported file type. Please upload a PDF, Word document, or image (PNG/JPG).");
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      throw AppException.validation("File is too large. Maximum size is 15 MB.");
+    }
   }
 }

@@ -16,6 +16,9 @@ out/
 # Prisma
 database/prisma/migrations/dev.db
 
+# Local-disk document storage (dev fallback when no S3 credentials are set)
+services/api/.data/
+
 # Logs
 *.log
 npm-debug.log*

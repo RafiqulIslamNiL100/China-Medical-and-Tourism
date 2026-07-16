@@ -1286,6 +1286,31 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/DocumentChecklistItem" }
+    post:
+      operationId: postApplicationsByApplicationIdDocuments
+      tags: [Documents]
+      summary: >
+        Ad-hoc document upload: creates its own checklist item rather than filling in
+        one of the items seeded on hospital/case-manager acceptance. Used by the
+        patient application wizard's Documents step, where no acceptance checklist
+        exists yet. Accepts PDF, DOC, DOCX, PNG, JPG, JPEG up to 15 MB.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                name: { type: string, description: "Defaults to the uploaded file's original name." }
+                category: { type: string, enum: [MedicalRecords, IdentityDocuments, VisaDocuments], description: "Defaults to MedicalRecords." }
+      responses:
+        "201":
+          description: Created and uploaded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentChecklistItem" }
 
   /applications/{applicationId}/documents/{documentId}/upload:
     parameters:
