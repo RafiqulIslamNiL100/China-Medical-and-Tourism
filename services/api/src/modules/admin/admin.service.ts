@@ -9,6 +9,7 @@ import { AppException } from "../../common/filters/app-exception";
 import { AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import {
   CreateCityDto,
+  CreateSpecialtyDto,
   InviteUserDto,
   ListAuditLogQuery,
   ListUsersQuery,
@@ -284,6 +285,28 @@ export class AdminService {
     return city;
   }
 
+  // --- specialties --------------------------------------------------------------
+
+  async createSpecialty(admin: AuthenticatedUser, dto: CreateSpecialtyDto) {
+    const existing = await this.prisma.specialty.findUnique({ where: { slug: dto.slug } });
+    if (existing) throw AppException.conflict("SLUG_IN_USE", "A specialty with this slug already exists.");
+
+    const specialty = await this.prisma.specialty.create({
+      data: { slug: dto.slug, name: dto.name, blurb: dto.blurb },
+    });
+
+    await this.audit.record({
+      actorUserId: admin.userId,
+      actorLabel: "Admin",
+      action: "specialty_created",
+      targetType: "Specialty",
+      targetId: specialty.slug,
+      metadata: { name: dto.name },
+    });
+
+    return specialty;
+  }
+
   // --- hospitals / doctors / packages (direct admin CRUD, bypasses the ---
   // --- hospital_staff moderation-queue flow since admins are trusted) ---
 
@@ -303,6 +326,7 @@ export class AdminService {
         description: dto.description,
         richProfileMarkdown: dto.richProfileMarkdown,
         priceTier: dto.priceTier,
+        specialtySlugs: dto.specialtySlugs ?? [],
         accreditations: dto.accreditations,
         languages: dto.languages,
         facilities: dto.facilities,
@@ -333,6 +357,7 @@ export class AdminService {
         richProfileMarkdown: dto.richProfileMarkdown ?? hospital.richProfileMarkdown,
         citySlug: dto.citySlug ?? hospital.citySlug,
         priceTier: dto.priceTier ?? hospital.priceTier,
+        specialtySlugs: dto.specialtySlugs ?? hospital.specialtySlugs,
         accreditations: dto.accreditations ?? hospital.accreditations,
         languages: dto.languages ?? hospital.languages,
         facilities: dto.facilities ?? hospital.facilities,

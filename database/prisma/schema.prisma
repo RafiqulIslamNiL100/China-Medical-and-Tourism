@@ -273,6 +273,11 @@ model Hospital {
   // short `description` can hold. Rendered as-is on the hospital detail page.
   richProfileMarkdown String?
   priceTier           String // "$$" | "$$$" | "$$$$" — small fixed vocabulary, not worth a table
+  // Specialties this hospital treats, independent of whether it has any Doctor/
+  // TreatmentPackage rows — lets a hospital with no listed doctors/packages still be
+  // suggested by specialty in the patient application wizard (searchHospitals OR's
+  // this in alongside the doctor/package specialty match below).
+  specialtySlugs      String[]              @default([])
   accreditations      String[]
   languages           String[]
   facilities          String[]

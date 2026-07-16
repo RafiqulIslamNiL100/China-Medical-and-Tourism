@@ -49,6 +49,7 @@ export class ApplicationsService {
         where: {
           status: HospitalListingStatus.Published,
           OR: [
+            { specialtySlugs: { has: dto.specialtySlug } },
             { doctors: { some: { specialtySlug: dto.specialtySlug } } },
             { packages: { some: { specialtySlug: dto.specialtySlug } } },
           ],

@@ -88,6 +88,12 @@ export type City = {
   climate?: string | null;
 };
 
+export type Specialty = {
+  slug: string;
+  name: string;
+  blurb?: string | null;
+};
+
 export type Hospital = {
   id: string;
   slug: string;
@@ -95,6 +101,7 @@ export type Hospital = {
   citySlug: string;
   description: string;
   richProfileMarkdown?: string | null;
+  specialtySlugs?: string[];
   priceTier: string;
   accreditations: string[];
   languages: string[];
@@ -422,6 +429,10 @@ export function deleteDependent(accessToken: string, dependentId: string) {
 
 export function searchHospitals(query: { city?: string; specialty?: string } = {}) {
   return request<Paginated<Hospital>>("/hospitals", { query });
+}
+
+export function listSpecialties() {
+  return request<Specialty[]>("/specialties");
 }
 
 export function getHospital(hospitalId: string) {
@@ -816,6 +827,10 @@ export function createCity(accessToken: string, input: { slug: string; name: str
   return request<City>("/admin/cities", { method: "POST", body: input, accessToken });
 }
 
+export function createSpecialty(accessToken: string, input: { slug: string; name: string; blurb?: string }) {
+  return request<Specialty>("/admin/specialties", { method: "POST", body: input, accessToken });
+}
+
 // --- Admin: hospitals / doctors / packages (direct CRUD, no moderation queue) ------------------
 
 export function listAllHospitalsAdmin(accessToken: string) {
@@ -831,6 +846,7 @@ export function createHospital(
     description: string;
     richProfileMarkdown?: string;
     priceTier: string;
+    specialtySlugs?: string[];
     accreditations: string[];
     languages: string[];
     facilities: string[];

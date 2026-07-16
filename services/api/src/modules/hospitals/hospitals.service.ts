@@ -22,6 +22,7 @@ export class HospitalsService {
       ...(query.specialty
         ? {
             OR: [
+              { specialtySlugs: { has: query.specialty } },
               { doctors: { some: { specialtySlug: query.specialty } } },
               { packages: { some: { specialtySlug: query.specialty } } },
             ],
@@ -40,6 +41,10 @@ export class HospitalsService {
     const hasMore = hospitals.length > take;
     const data = hasMore ? hospitals.slice(0, take) : hospitals;
     return { data, meta: { nextCursor: hasMore ? data[data.length - 1].id : null, hasMore } };
+  }
+
+  async listSpecialties() {
+    return this.prisma.specialty.findMany({ orderBy: { name: "asc" } });
   }
 
   /** The hospital this staff member belongs to — Screen 20's "my hospital" context. */

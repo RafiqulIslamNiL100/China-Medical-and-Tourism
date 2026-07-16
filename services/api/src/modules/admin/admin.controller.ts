@@ -5,6 +5,7 @@ import { UserRole } from "@prisma/client";
 import { AdminService } from "./admin.service";
 import {
   CreateCityDto,
+  CreateSpecialtyDto,
   InviteUserDto,
   ListAuditLogQuery,
   ListUsersQuery,
@@ -90,6 +91,13 @@ export class AdminController {
   @Post("cities")
   createCity(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateCityDto) {
     return this.adminService.createCity(user, dto);
+  }
+
+  // --- specialties --------------------------------------------------------------
+
+  @Post("specialties")
+  createSpecialty(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateSpecialtyDto) {
+    return this.adminService.createSpecialty(user, dto);
   }
 
   // --- hospitals / doctors / packages: direct admin CRUD, bypassing the ---
