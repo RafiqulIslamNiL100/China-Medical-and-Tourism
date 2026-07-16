@@ -14,10 +14,10 @@ const { PrismaClient } = require("@prisma/client");
 const argon2 = require("argon2");
 
 const DEMO_EMAILS = [
-  "sarah.chen@cmt-platform.com",
+  "sarah.chen@asiahealthlink.com",
   "jing.zhao@buf-hospital.cn",
   "ex-staff@buf-hospital.cn",
-  "li.wei@cmt-platform.com",
+  "li.wei@asiahealthlink.com",
   "zhang.wei@drivers.cmt.com",
   "sun.li@interpreters.cmt.com",
   "bookings@riverside-suites.cn",

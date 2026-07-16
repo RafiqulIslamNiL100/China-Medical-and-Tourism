@@ -36,7 +36,7 @@ export type PlatformUser = {
 export const platformUsers: PlatformUser[] = [
   { id: "u-1", name: "Amara Nwosu", email: "amara.nwosu@example.com", role: "patient", status: "Active", lastLogin: "2026-07-11" },
   { id: "u-2", name: "Jing Zhao", email: "jing.zhao@buf-hospital.cn", role: "hospital_staff", status: "Active", lastLogin: "2026-07-12" },
-  { id: "u-3", name: "Li Wei", email: "li.wei@cmt-platform.com", role: "case_manager", status: "Active", lastLogin: "2026-07-12" },
+  { id: "u-3", name: "Li Wei", email: "li.wei@asiahealthlink.com", role: "case_manager", status: "Active", lastLogin: "2026-07-12" },
   { id: "u-4", name: "Zhang Wei", email: "zhang.wei@drivers.cmt.com", role: "driver", status: "Active", lastLogin: "2026-07-10" },
   { id: "u-5", name: "Sun Li", email: "sun.li@interpreters.cmt.com", role: "interpreter", status: "Active", lastLogin: "2026-07-09" },
   { id: "u-6", name: "Riverside Suites Mgmt", email: "bookings@riverside-suites.cn", role: "hotel_partner", status: "Active", lastLogin: "2026-07-08" },

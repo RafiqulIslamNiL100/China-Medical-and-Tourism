@@ -278,7 +278,7 @@ async function main() {
   // --- Staff & platform users ----------------------------------------------
   const admin = await prisma.user.create({
     data: {
-      email: "sarah.chen@cmt-platform.com",
+      email: "sarah.chen@asiahealthlink.com",
       passwordHash,
       role: UserRole.admin,
       status: UserStatus.Active,
@@ -310,7 +310,7 @@ async function main() {
 
   const liWeiCaseManager = await prisma.user.create({
     data: {
-      email: "li.wei@cmt-platform.com",
+      email: "li.wei@asiahealthlink.com",
       passwordHash,
       role: UserRole.case_manager,
       status: UserStatus.Active,
@@ -708,7 +708,7 @@ async function main() {
   await prisma.platformSetting.createMany({
     data: [
       { key: "platform_name", value: "Asia Health Link and Travel" },
-      { key: "support_email", value: "support@cmt-platform.com" },
+      { key: "support_email", value: "support@asiahealthlink.com" },
       { key: "default_deposit_rate", value: 0.2 },
     ],
   });
@@ -753,9 +753,9 @@ async function main() {
   console.log(
     `\nDemo accounts (all share ${process.env.SEED_DEMO_PASSWORD ? "the password from SEED_DEMO_PASSWORD" : "password: Passw0rd!23"}):`,
   );
-  console.log("  admin           sarah.chen@cmt-platform.com");
+  console.log("  admin           sarah.chen@asiahealthlink.com");
   console.log("  hospital_staff  jing.zhao@buf-hospital.cn (Beijing United Family Hospital)");
-  console.log("  case_manager    li.wei@cmt-platform.com");
+  console.log("  case_manager    li.wei@asiahealthlink.com");
   console.log("  driver          zhang.wei@drivers.cmt.com");
   console.log("  interpreter     sun.li@interpreters.cmt.com");
   console.log("  hotel_partner   bookings@riverside-suites.cn (Beijing Riverside Suites)");

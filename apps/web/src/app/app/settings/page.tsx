@@ -153,8 +153,8 @@ export default function SettingsPage() {
         <h2 className="mb-2 font-bold text-neutral-900">Privacy</h2>
         <p className="mb-4 text-sm text-neutral-600">
           Request a copy of your data, or request deletion subject to legal retention requirements. Email{" "}
-          <a href="mailto:privacy@cmt-platform.com" className="font-semibold text-primary-700">
-            privacy@cmt-platform.com
+          <a href="mailto:privacy@asiahealthlink.com" className="font-semibold text-primary-700">
+            privacy@asiahealthlink.com
           </a>{" "}
           to make a request.
         </p>

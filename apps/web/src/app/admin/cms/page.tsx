@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/auth-client";
@@ -14,6 +14,8 @@ export default function AdminCmsPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ title: "", category: "", excerpt: "", body: "" });
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", category: "", excerpt: "", body: "" });
 
   useEffect(() => {
     if (!accessToken) return;
@@ -42,6 +44,29 @@ export default function AdminCmsPage() {
       status: article.status === "Published" ? "Draft" : "Published",
     });
     setArticles((prev) => prev.map((a) => (a.id === article.id ? updated : a)));
+  }
+
+  function startEdit(article: Article) {
+    setEditingId(article.id);
+    setEditForm({
+      title: article.title,
+      category: article.category ?? "",
+      excerpt: article.excerpt ?? "",
+      body: article.body,
+    });
+  }
+
+  async function handleSaveEdit(e: React.FormEvent, article: Article) {
+    e.preventDefault();
+    if (!accessToken) return;
+    setError(null);
+    try {
+      const updated = await updateArticle(accessToken, article.slug, editForm);
+      setArticles((prev) => prev.map((a) => (a.id === article.id ? updated : a)));
+      setEditingId(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not save article.");
+    }
   }
 
   if (loading) return <p className="text-sm text-neutral-500">Loading…</p>;
@@ -79,19 +104,64 @@ export default function AdminCmsPage() {
           </thead>
           <tbody>
             {articles.map((a) => (
-              <tr key={a.id} className="border-b border-neutral-100 last:border-0">
-                <td className="px-4 py-3 font-semibold text-neutral-900">{a.title}</td>
-                <td className="px-4 py-3 text-neutral-700">{a.category ?? "—"}</td>
-                <td className="px-4 py-3 text-neutral-500">{fmtDate(a.publishedAt)}</td>
-                <td className="px-4 py-3">
-                  <Badge tone={a.status === "Published" ? "success" : "neutral"}>{a.status}</Badge>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button className="text-xs font-semibold text-primary-700" onClick={() => handleTogglePublish(a)}>
-                    {a.status === "Published" ? "Unpublish" : "Publish"}
-                  </button>
-                </td>
-              </tr>
+              <Fragment key={a.id}>
+                <tr className="border-b border-neutral-100 last:border-0">
+                  <td className="px-4 py-3 font-semibold text-neutral-900">{a.title}</td>
+                  <td className="px-4 py-3 text-neutral-700">{a.category ?? "—"}</td>
+                  <td className="px-4 py-3 text-neutral-500">{fmtDate(a.publishedAt)}</td>
+                  <td className="px-4 py-3">
+                    <Badge tone={a.status === "Published" ? "success" : "neutral"}>{a.status}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <button
+                      className="mr-3 text-xs font-semibold text-primary-700"
+                      onClick={() => (editingId === a.id ? setEditingId(null) : startEdit(a))}
+                    >
+                      {editingId === a.id ? "Cancel" : "Edit"}
+                    </button>
+                    <button className="text-xs font-semibold text-primary-700" onClick={() => handleTogglePublish(a)}>
+                      {a.status === "Published" ? "Unpublish" : "Publish"}
+                    </button>
+                  </td>
+                </tr>
+                {editingId === a.id ? (
+                  <tr className="border-b border-neutral-100 last:border-0 bg-neutral-100">
+                    <td colSpan={5} className="px-4 py-4">
+                      <form onSubmit={(e) => handleSaveEdit(e, a)} className="grid gap-3 sm:grid-cols-2">
+                        {error ? <p className="text-sm text-danger-600 sm:col-span-2">{error}</p> : null}
+                        <input
+                          required
+                          placeholder="Title"
+                          value={editForm.title}
+                          onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                          className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+                        />
+                        <input
+                          placeholder="Category"
+                          value={editForm.category}
+                          onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                          className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+                        />
+                        <input
+                          placeholder="Excerpt"
+                          value={editForm.excerpt}
+                          onChange={(e) => setEditForm((f) => ({ ...f, excerpt: e.target.value }))}
+                          className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm sm:col-span-2"
+                        />
+                        <textarea
+                          required
+                          placeholder="Body"
+                          rows={6}
+                          value={editForm.body}
+                          onChange={(e) => setEditForm((f) => ({ ...f, body: e.target.value }))}
+                          className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm sm:col-span-2"
+                        />
+                        <Button type="submit" size="sm" className="w-fit">Save Changes</Button>
+                      </form>
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
             ))}
             {articles.length === 0 ? (
               <tr>

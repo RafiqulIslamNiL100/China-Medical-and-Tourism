@@ -11,6 +11,14 @@ import {
   UpdateSettingDto,
   UpdateUserDto,
 } from "./dto/admin.dto";
+import {
+  AdminUpdateHospitalDto,
+  CreateDoctorDto,
+  CreateHospitalDto,
+  CreateTreatmentPackageDto,
+  UpdateDoctorDto,
+  UpdatePackageDto,
+} from "../hospitals/dto/hospitals.dto";
 
 @Controller("admin")
 @Roles(UserRole.admin)
@@ -69,5 +77,65 @@ export class AdminController {
   @Put("settings")
   updateSetting(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateSettingDto) {
     return this.adminService.updateSetting(user, dto);
+  }
+
+  // --- hospitals / doctors / packages: direct admin CRUD, bypassing the ---
+  // --- hospital_staff moderation-queue flow since admins are trusted ---
+
+  @Get("hospitals")
+  listAllHospitals() {
+    return this.adminService.listAllHospitals();
+  }
+
+  @Post("hospitals")
+  createHospital(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateHospitalDto) {
+    return this.adminService.createHospital(user, dto);
+  }
+
+  @Patch("hospitals/:hospitalId")
+  updateHospital(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("hospitalId") hospitalId: string,
+    @Body() dto: AdminUpdateHospitalDto,
+  ) {
+    return this.adminService.updateHospital(user, hospitalId, dto);
+  }
+
+  @Post("hospitals/:hospitalId/doctors")
+  createDoctor(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("hospitalId") hospitalId: string,
+    @Body() dto: CreateDoctorDto,
+  ) {
+    return this.adminService.createDoctor(user, hospitalId, dto);
+  }
+
+  @Patch("hospitals/:hospitalId/doctors/:doctorId")
+  updateDoctor(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("hospitalId") hospitalId: string,
+    @Param("doctorId") doctorId: string,
+    @Body() dto: UpdateDoctorDto,
+  ) {
+    return this.adminService.updateDoctor(user, hospitalId, doctorId, dto);
+  }
+
+  @Post("hospitals/:hospitalId/packages")
+  createPackage(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("hospitalId") hospitalId: string,
+    @Body() dto: CreateTreatmentPackageDto,
+  ) {
+    return this.adminService.createPackage(user, hospitalId, dto);
+  }
+
+  @Patch("hospitals/:hospitalId/packages/:packageId")
+  updatePackage(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("hospitalId") hospitalId: string,
+    @Param("packageId") packageId: string,
+    @Body() dto: UpdatePackageDto,
+  ) {
+    return this.adminService.updatePackage(user, hospitalId, packageId, dto);
   }
 }
