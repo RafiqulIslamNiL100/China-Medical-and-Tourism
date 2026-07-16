@@ -1,14 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
-import { specialties } from "@/data/hospitals";
-import { searchHospitals, createApplication, ApiError, type Hospital } from "@/lib/api";
+import {
+  searchHospitals,
+  createApplication,
+  listSpecialties,
+  uploadNewDocument,
+  ApiError,
+  type Hospital,
+  type Specialty,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth-client";
 
 const steps = ["Specialty & Hospital", "Preferred Dates", "Medical History", "Documents", "Review & Submit"];
+
+const ACCEPTED_FILE_TYPES = [".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg"];
+const ACCEPTED_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/png",
+  "image/jpeg",
+]);
+const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 
 export function ApplicationWizard() {
   const router = useRouter();
@@ -18,8 +35,13 @@ export function ApplicationWizard() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [matchingHospitals, setMatchingHospitals] = useState<Hospital[]>([]);
+  const [specialtyList, setSpecialtyList] = useState<Specialty[]>([]);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
-    specialty: specialties[0].slug as string,
+    specialty: "",
     hospital: "",
     flexible: true,
     startDate: "",
@@ -30,6 +52,16 @@ export function ApplicationWizard() {
   });
 
   useEffect(() => {
+    listSpecialties()
+      .then((list) => {
+        setSpecialtyList(list);
+        setForm((f) => (f.specialty ? f : { ...f, specialty: list[0]?.slug ?? "" }));
+      })
+      .catch(() => setSpecialtyList([]));
+  }, []);
+
+  useEffect(() => {
+    if (!form.specialty) return;
     searchHospitals({ specialty: form.specialty })
       .then(({ data }) => setMatchingHospitals(data))
       .catch(() => setMatchingHospitals([]));
@@ -37,6 +69,28 @@ export function ApplicationWizard() {
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function addFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    setFileError(null);
+    const accepted: File[] = [];
+    for (const file of Array.from(fileList)) {
+      if (!ACCEPTED_MIME_TYPES.has(file.type)) {
+        setFileError(`${file.name}: unsupported file type. Allowed: PDF, DOC, DOCX, PNG, JPG, JPEG.`);
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        setFileError(`${file.name}: file is too large (max 15 MB).`);
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (accepted.length) setStagedFiles((prev) => [...prev, ...accepted]);
+  }
+
+  function removeStagedFile(index: number) {
+    setStagedFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit() {
@@ -47,7 +101,7 @@ export function ApplicationWizard() {
     setSubmitError(null);
     setSubmitting(true);
     try {
-      await createApplication(accessToken, {
+      const application = await createApplication(accessToken, {
         hospitalId: form.hospital || undefined,
         specialtySlug: form.specialty,
         preferredStartDate: form.startDate || undefined,
@@ -57,6 +111,11 @@ export function ApplicationWizard() {
         allergies: form.allergies || undefined,
         consentToProcessMedicalData: form.consent,
       });
+
+      for (const file of stagedFiles) {
+        await uploadNewDocument(accessToken, application.id, file);
+      }
+
       setSubmitted(true);
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
@@ -126,7 +185,7 @@ export function ApplicationWizard() {
                 onChange={(e) => update("specialty", e.target.value)}
                 className="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:outline-2 focus:outline-primary-600"
               >
-                {specialties.map((s) => (
+                {specialtyList.map((s) => (
                   <option key={s.slug} value={s.slug}>
                     {s.name}
                   </option>
@@ -229,9 +288,58 @@ export function ApplicationWizard() {
               Upload any existing diagnostic reports or medical records. This step is
               optional — you can submit without them and add documents later.
             </p>
-            <div className="rounded-[10px] border-2 border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500">
+            {fileError ? (
+              <p className="rounded-md bg-danger-50 px-3 py-2 text-sm text-danger-700">{fileError}</p>
+            ) : null}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                addFiles(e.dataTransfer.files);
+              }}
+              className={`cursor-pointer rounded-[10px] border-2 border-dashed p-8 text-center text-sm transition-colors ${
+                dragActive ? "border-primary-600 bg-primary-50 text-primary-700" : "border-neutral-300 text-neutral-500"
+              }`}
+            >
               Drag files here, or click to browse
+              <p className="mt-1 text-xs text-neutral-400">PDF, DOC, DOCX, PNG, JPG, JPEG — max 15 MB each</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={ACCEPTED_FILE_TYPES.join(",")}
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+                className="hidden"
+              />
             </div>
+            {stagedFiles.length > 0 ? (
+              <ul className="flex flex-col gap-2">
+                {stagedFiles.map((file, i) => (
+                  <li
+                    key={`${file.name}-${i}`}
+                    className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm"
+                  >
+                    <span className="truncate text-neutral-700">{file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeStagedFile(i)}
+                      className="ml-3 shrink-0 text-xs font-semibold text-danger-600 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         ) : null}
 
@@ -245,7 +353,7 @@ export function ApplicationWizard() {
               <div className="flex justify-between border-b border-neutral-100 pb-2">
                 <dt className="text-neutral-500">Specialty</dt>
                 <dd className="font-semibold text-neutral-900">
-                  {specialties.find((s) => s.slug === form.specialty)?.name}
+                  {specialtyList.find((s) => s.slug === form.specialty)?.name}
                 </dd>
               </div>
               <div className="flex justify-between border-b border-neutral-100 pb-2">
@@ -258,6 +366,12 @@ export function ApplicationWizard() {
                 <dt className="text-neutral-500">Preferred start date</dt>
                 <dd className="font-semibold text-neutral-900">
                   {form.startDate || "Flexible"}
+                </dd>
+              </div>
+              <div className="flex justify-between border-b border-neutral-100 pb-2">
+                <dt className="text-neutral-500">Documents</dt>
+                <dd className="font-semibold text-neutral-900">
+                  {stagedFiles.length > 0 ? `${stagedFiles.length} file${stagedFiles.length === 1 ? "" : "s"}` : "None attached"}
                 </dd>
               </div>
             </dl>

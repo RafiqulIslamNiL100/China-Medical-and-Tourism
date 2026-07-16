@@ -563,6 +563,19 @@ export function uploadDocument(accessToken: string, applicationId: string, docum
   });
 }
 
+/** Ad-hoc upload used by the application wizard — creates its own checklist item rather
+ * than filling in one of the items seeded on hospital/case-manager acceptance. */
+export function uploadNewDocument(accessToken: string, applicationId: string, file: File, name?: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (name) formData.append("name", name);
+  return request<ChecklistItem>(`/applications/${applicationId}/documents`, {
+    method: "POST",
+    formData,
+    accessToken,
+  });
+}
+
 export function verifyDocument(accessToken: string, applicationId: string, documentId: string, approved: boolean, note?: string) {
   return request<ChecklistItem>(`/applications/${applicationId}/documents/${documentId}/verify`, {
     method: "POST",
