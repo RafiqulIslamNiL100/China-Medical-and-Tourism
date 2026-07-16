@@ -37,6 +37,27 @@ export function RequireRole({ roles, children }: { roles: Role[]; children: Reac
   return <>{children}</>;
 }
 
+/** Where to land a user right after login, based on their role. */
+export function roleHomePath(role: Role): string {
+  switch (role) {
+    case "admin":
+      return "/admin/dashboard";
+    case "hospital_staff":
+      return "/hospital/dashboard";
+    case "case_manager":
+      return "/ops/queue";
+    case "driver":
+      return "/partner/driver/trips";
+    case "hotel_partner":
+      return "/partner/hotel/dashboard";
+    case "interpreter":
+      return "/partner/interpreter/appointments";
+    case "patient":
+    default:
+      return "/app/dashboard";
+  }
+}
+
 export function fmtDate(value: string | null | undefined): string {
   if (!value) return "—";
   return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
