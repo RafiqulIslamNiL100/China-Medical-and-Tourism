@@ -97,18 +97,54 @@ async function main() {
   const otpMatch = serverOutput.match(new RegExp(`${email}[^\\n]*verification code is (\\d{6})`));
   check("OTP code appears in email dispatch log", !!otpMatch);
 
+  // --- login before verifying must be rejected, not silently allowed --------------
+  const unverifiedLoginRes = await fetch(`${BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emailOrPhone: email, password }),
+  });
+  const unverifiedLoginBody = await unverifiedLoginRes.json();
+  check(
+    "login before email verification is rejected (EMAIL_NOT_VERIFIED)",
+    unverifiedLoginRes.status === 403 && unverifiedLoginBody.error?.code === "EMAIL_NOT_VERIFIED",
+    JSON.stringify(unverifiedLoginBody).slice(0, 200),
+  );
+
+  // --- resend-verification issues a new code, invalidating the first ---------------
+  let latestOtpMatch = otpMatch;
+  if (userId) {
+    const resendRes = await fetch(`${BASE}/auth/resend-verification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    check("resend-verification returns 204", resendRes.status === 204);
+    await sleep(500);
+    const allMatches = [...serverOutput.matchAll(new RegExp(`${email}[^\\n]*verification code is (\\d{6})`, "g"))];
+    latestOtpMatch = allMatches.length > 0 ? allMatches[allMatches.length - 1] : otpMatch;
+    check("resend-verification issued a second, different code", allMatches.length >= 2 && latestOtpMatch[1] !== otpMatch?.[1]);
+  }
+
   // --- verify → tokens --------------------------------------------------------
   let accessToken = "";
-  if (userId && otpMatch) {
+  if (userId && latestOtpMatch) {
     const verifyRes = await fetch(`${BASE}/auth/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, code: otpMatch[1] }),
+      body: JSON.stringify({ userId, code: latestOtpMatch[1] }),
     });
     const verifyBody = await verifyRes.json();
     check("verify returns access+refresh tokens", !!verifyBody.accessToken && !!verifyBody.refreshToken, JSON.stringify(verifyBody).slice(0, 200));
     accessToken = verifyBody.accessToken ?? "";
   }
+
+  // --- login after verifying now succeeds ------------------------------------------
+  const verifiedLoginRes = await fetch(`${BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emailOrPhone: email, password }),
+  });
+  check("login after email verification succeeds", verifiedLoginRes.status === 200);
 
   // --- /me with and without token ---------------------------------------------
   const meRes = await fetch(`${BASE}/me`, { headers: { Authorization: `Bearer ${accessToken}` } });

@@ -92,7 +92,12 @@ export class AdminService {
     const passwordHash = await argon2.hash(tempPassword);
 
     const created = await this.prisma.user.create({
-      data: { email: dto.email, passwordHash, role: dto.role },
+      // Admin-invited accounts skip self-service OTP verification — the admin entering
+      // this email address is itself the trust bootstrap, same as inviting a teammate
+      // in most SaaS products. Without this, invited staff could never log in: they
+      // get a "set your password" email, not an OTP, so login()'s emailVerifiedAt gate
+      // would lock them out permanently.
+      data: { email: dto.email, passwordHash, role: dto.role, emailVerifiedAt: new Date() },
     });
 
     await this.notifications.notify({

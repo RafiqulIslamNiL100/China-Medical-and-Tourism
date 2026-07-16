@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Container } from "@/components/Section";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/auth-client";
-import { ApiError } from "@/lib/api";
+import { ApiError, resendVerification } from "@/lib/api";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,6 +19,7 @@ export default function RegisterPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleRegister(e: React.FormEvent) {
@@ -57,6 +58,18 @@ export default function RegisterPage() {
     }
   }
 
+  async function handleResend() {
+    if (!userId) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await resendVerification(userId);
+      setNotice(`We sent a new verification code to ${email}.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not resend the code. Please try again.");
+    }
+  }
+
   if (step === "verify") {
     return (
       <Container className="flex min-h-[70vh] items-center justify-center py-16">
@@ -69,6 +82,7 @@ export default function RegisterPage() {
             {error ? (
               <p className="rounded-md bg-danger-50 px-3 py-2 text-sm text-danger-700">{error}</p>
             ) : null}
+            {notice ? <p className="rounded-md bg-success-100 px-3 py-2 text-sm text-success-600">{notice}</p> : null}
             <div className="flex flex-col gap-1">
               <label htmlFor="code" className="text-sm font-semibold text-neutral-900">
                 Verification code
@@ -88,6 +102,9 @@ export default function RegisterPage() {
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? "Verifying…" : "Verify & Continue"}
             </Button>
+            <button type="button" onClick={handleResend} className="text-center text-sm font-semibold text-primary-700">
+              Resend code
+            </button>
           </form>
         </div>
       </Container>

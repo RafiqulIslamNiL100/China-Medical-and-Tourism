@@ -607,6 +607,25 @@ paths:
               schema: { $ref: "#/components/schemas/AuthTokens" }
         "400": { $ref: "#/components/responses/ValidationError" }
 
+  /auth/resend-verification:
+    post:
+      operationId: postAuthResendVerification
+      tags: [Auth]
+      summary: Re-send the OTP for an account that hasn't completed email verification (FR-AUTH-02)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string, format: uuid }
+      responses:
+        "204": { description: "A new code was sent." }
+        "409": { description: "Account is already verified — nothing to resend." }
+
   /auth/login:
     post:
       operationId: postAuthLogin
@@ -631,6 +650,8 @@ paths:
                       twoFactorRequired: { type: boolean }
                       challengeId: { type: string }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: "Credentials are correct but the account's email isn't verified yet (code EMAIL_NOT_VERIFIED). The error's `details.userId` can be passed to POST /auth/verify or /auth/resend-verification."
 
   /auth/2fa/verify:
     post:

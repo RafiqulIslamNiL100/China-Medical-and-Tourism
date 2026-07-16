@@ -361,6 +361,10 @@ export function verifyEmail(input: { userId: string; code: string }) {
   return request<AuthTokens>("/auth/verify", { method: "POST", body: input });
 }
 
+export function resendVerification(userId: string) {
+  return request<void>("/auth/resend-verification", { method: "POST", body: { userId } });
+}
+
 export function login(input: { emailOrPhone: string; password: string }) {
   return request<AuthTokens | { challengeId: string; twoFactorRequired: true }>("/auth/login", {
     method: "POST",

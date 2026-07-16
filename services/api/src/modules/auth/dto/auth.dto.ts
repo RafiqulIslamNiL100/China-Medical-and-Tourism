@@ -8,6 +8,11 @@ export class VerifyDto {
   code!: string;
 }
 
+export class ResendVerificationDto {
+  @IsString()
+  userId!: string;
+}
+
 export class LoginDto {
   @IsString()
   emailOrPhone!: string;
