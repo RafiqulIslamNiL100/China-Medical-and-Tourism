@@ -424,14 +424,6 @@ export function searchHospitals(query: { city?: string; specialty?: string } = {
   return request<Paginated<Hospital>>("/hospitals", { query });
 }
 
-export type TreatmentPackageWithHospital = TreatmentPackage & {
-  hospital: { name: string; slug: string; citySlug: string };
-};
-
-export function searchTreatments(query: { search?: string; specialty?: string; city?: string; limit?: number } = {}) {
-  return request<Paginated<TreatmentPackageWithHospital>>("/treatments", { query });
-}
-
 export function getHospital(hospitalId: string) {
   return request<Hospital>(`/hospitals/${hospitalId}`);
 }

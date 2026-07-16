@@ -9,7 +9,6 @@ export type HospitalCardData = {
   specialties: string[];
   rating: number;
   reviewCount: number;
-  priceTier: string;
 };
 
 export function HospitalCard({ hospital }: { hospital: HospitalCardData }) {
@@ -33,9 +32,7 @@ export function HospitalCard({ hospital }: { hospital: HospitalCardData }) {
         </p>
         <div className="mt-auto flex items-center justify-between pt-2">
           <Stars rating={hospital.rating} />
-          <span className="text-xs text-neutral-500">
-            {hospital.reviewCount} reviews &middot; {hospital.priceTier}
-          </span>
+          <span className="text-xs text-neutral-500">{hospital.reviewCount} reviews</span>
         </div>
       </div>
     </Link>

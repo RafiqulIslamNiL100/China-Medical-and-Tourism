@@ -281,18 +281,6 @@ components:
         includes: { type: array, items: { type: string } }
         status: { type: string, enum: [Draft, Active, Archived] }
 
-    TreatmentPackageWithHospital:
-      allOf:
-        - $ref: "#/components/schemas/TreatmentPackage"
-        - type: object
-          properties:
-            hospital:
-              type: object
-              properties:
-                name: { type: string }
-                slug: { type: string }
-                citySlug: { type: string }
-
     Application:
       type: object
       properties:
@@ -902,38 +890,6 @@ paths:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/Hospital" }
-                  meta: { $ref: "#/components/schemas/PaginatedMeta" }
-
-  /treatments:
-    get:
-      operationId: getTreatments
-      tags: [Hospitals]
-      summary: Search/browse treatment packages across every published hospital — homepage "Explore Treatments" and the /treatments page
-      security: []
-      parameters:
-        - name: search
-          in: query
-          description: Case-insensitive substring match on the package name
-          schema: { type: string }
-        - name: specialty
-          in: query
-          schema: { type: string }
-        - name: city
-          in: query
-          schema: { type: string }
-        - { $ref: "#/components/parameters/CursorParam" }
-        - { $ref: "#/components/parameters/LimitParam" }
-      responses:
-        "200":
-          description: OK.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items: { $ref: "#/components/schemas/TreatmentPackageWithHospital" }
                   meta: { $ref: "#/components/schemas/PaginatedMeta" }
 
   /hospitals/mine:

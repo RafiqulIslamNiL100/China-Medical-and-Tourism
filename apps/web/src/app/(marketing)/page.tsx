@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { Container } from "@/components/Section";
-import { Badge } from "@/components/Badge";
 import { HospitalCard } from "@/components/HospitalCard";
 import { Stars } from "@/components/Stars";
 import { hospitals, specialties, cities, testimonials } from "@/data/hospitals";
-import { searchTreatments } from "@/lib/api";
 
 const steps = [
   {
@@ -14,7 +12,7 @@ const steps = [
   },
   {
     title: "Get Matched",
-    body: "A hospital reviews your case and sends a treatment plan with transparent pricing.",
+    body: "A hospital reviews your case and sends back a personalized treatment plan.",
   },
   {
     title: "Travel & Treat",
@@ -26,10 +24,9 @@ const steps = [
   },
 ];
 
-export default async function HomePage() {
+export default function HomePage() {
   const featured = hospitals.slice(0, 3);
   const topReviews = testimonials.slice(0, 3);
-  const { data: featuredTreatments } = await searchTreatments({ limit: 3 });
 
   return (
     <>
@@ -79,53 +76,6 @@ export default async function HomePage() {
               </Link>
             ))}
           </div>
-        </Container>
-      </section>
-
-      <section className="border-b border-neutral-300/70 bg-neutral-100 py-16">
-        <Container>
-          <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
-            <div>
-              <h2 className="text-2xl font-bold text-neutral-900">Explore treatments</h2>
-              <p className="text-neutral-500">
-                Search fixed-scope treatment packages across every accredited partner hospital.
-              </p>
-            </div>
-            <form action="/treatments" className="flex w-full gap-2 sm:w-auto">
-              <input
-                type="text"
-                name="q"
-                placeholder="e.g. knee replacement"
-                className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-primary-600 sm:w-64"
-              />
-              <Button type="submit" size="md">
-                Search
-              </Button>
-            </form>
-          </div>
-          {featuredTreatments.length > 0 ? (
-            <div className="grid gap-5 sm:grid-cols-3">
-              {featuredTreatments.map((pkg) => (
-                <Link
-                  key={pkg.id}
-                  href={`/hospitals/${pkg.hospital.slug}#packages`}
-                  className="flex flex-col gap-2 rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-neutral-900">{pkg.name}</h3>
-                    <span className="whitespace-nowrap font-semibold text-primary-700">
-                      ${Number(pkg.priceMinUsd).toLocaleString()}+
-                    </span>
-                  </div>
-                  <Badge tone="neutral">{pkg.hospital.name}</Badge>
-                  <p className="text-sm text-neutral-600">{pkg.description}</p>
-                </Link>
-              ))}
-            </div>
-          ) : null}
-          <Link href="/treatments" className="mt-6 inline-block text-sm font-semibold text-primary-700">
-            Browse all treatments &rarr;
-          </Link>
         </Container>
       </section>
 
