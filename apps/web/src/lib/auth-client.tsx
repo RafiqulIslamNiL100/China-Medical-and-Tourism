@@ -11,7 +11,7 @@ type AuthState = {
   user: api.User | null;
   accessToken: string | null;
   loading: boolean;
-  login: (emailOrPhone: string, password: string) => Promise<void>;
+  login: (emailOrPhone: string, password: string) => Promise<api.User>;
   register: (input: {
     email: string;
     password: string;
@@ -19,7 +19,7 @@ type AuthState = {
     termsAccepted: boolean;
     marketingConsent: boolean;
   }) => Promise<{ userId: string }>;
-  verifyEmail: (userId: string, code: string) => Promise<void>;
+  verifyEmail: (userId: string, code: string) => Promise<api.User>;
   logout: () => void;
 };
 
@@ -68,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(tokens.accessToken);
     const profile = await api.me(tokens.accessToken);
     setUser(profile);
+    return profile;
   }, []);
 
   const login = useCallback(
@@ -76,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if ("twoFactorRequired" in result) {
         throw new api.ApiError(200, "TWO_FACTOR_REQUIRED", "Two-factor authentication is required for this account.");
       }
-      await applyTokens(result);
+      return applyTokens(result);
     },
     [applyTokens],
   );
@@ -92,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyEmail = useCallback(
     async (userId: string, code: string) => {
       const tokens = await api.verifyEmail({ userId, code });
-      await applyTokens(tokens);
+      return applyTokens(tokens);
     },
     [applyTokens],
   );

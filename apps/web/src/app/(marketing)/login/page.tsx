@@ -7,6 +7,7 @@ import { Container } from "@/components/Section";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/auth-client";
 import { ApiError, resendVerification } from "@/lib/api";
+import { roleHomePath } from "@/lib/portal";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,8 +26,8 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(emailOrPhone, password);
-      router.push("/app/dashboard");
+      const profile = await login(emailOrPhone, password);
+      router.push(roleHomePath(profile.role));
     } catch (err) {
       if (err instanceof ApiError && err.code === "EMAIL_NOT_VERIFIED") {
         const userId = err.details?.userId;
@@ -54,8 +55,8 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await verifyEmail(unverifiedUserId, code);
-      router.push("/app/dashboard");
+      const profile = await verifyEmail(unverifiedUserId, code);
+      router.push(roleHomePath(profile.role));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Invalid or expired code. Please try again.");
     } finally {
