@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/Badge";
-import { Button } from "@/components/Button";
 import { SlaChip } from "@/components/portal/SlaChip";
 import { useAuth } from "@/lib/auth-client";
 import { statusLabel, slaRiskFor } from "@/lib/portal";
-import { getApplication, listDocuments, decideApplication, ApiError, type Application, type ChecklistItem } from "@/lib/api";
+import { getApplication, listDocuments, ApiError, type Application, type ChecklistItem } from "@/lib/api";
 
 const docStatusTone = {
   NotUploaded: "neutral",
@@ -17,22 +16,13 @@ const docStatusTone = {
   Rejected: "danger",
 } as const;
 
-type DecisionMode = "Accept" | "RequestInfo" | "Decline" | null;
-
 export default function HospitalApplicationDetailPage() {
   const params = useParams<{ id: string }>();
   const applicationId = params.id;
-  const router = useRouter();
   const { accessToken } = useAuth();
 
   const [application, setApplication] = useState<Application | null | undefined>(undefined);
   const [documents, setDocuments] = useState<ChecklistItem[]>([]);
-  const [mode, setMode] = useState<DecisionMode>(null);
-  const [treatmentPlan, setTreatmentPlan] = useState("");
-  const [costMin, setCostMin] = useState("");
-  const [costMax, setCostMax] = useState("");
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,33 +38,8 @@ export default function HospitalApplicationDetailPage() {
       });
   }, [accessToken, applicationId]);
 
-  async function handleDecision(e: React.FormEvent) {
-    e.preventDefault();
-    if (!accessToken || !mode) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const updated = await decideApplication(accessToken, applicationId, {
-        decision: mode,
-        treatmentPlan: mode === "Accept" ? treatmentPlan : undefined,
-        costEstimateMinUsd: mode === "Accept" ? Number(costMin) : undefined,
-        costEstimateMaxUsd: mode === "Accept" ? Number(costMax) : undefined,
-        message: mode !== "Accept" ? message : undefined,
-      });
-      setApplication((prev) => (prev ? { ...prev, ...updated } : updated));
-      setMode(null);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not submit decision.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   if (application === undefined) return <p className="p-8 text-sm text-neutral-500">Loading…</p>;
   if (application === null) notFound();
-
-  const canDecide = application.status === "Submitted" || application.status === "UnderReview" || application.status === "InfoRequested";
 
   return (
     <div className="flex flex-col gap-6">
@@ -130,77 +95,12 @@ export default function HospitalApplicationDetailPage() {
         </div>
 
         <aside className="h-fit rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm">
-          <h2 className="mb-3 font-bold text-neutral-900">Decision</h2>
-          {canDecide ? (
-            <>
-              {mode === null ? (
-                <div className="flex flex-col gap-2">
-                  <Button size="sm" className="w-full" onClick={() => setMode("Accept")}>
-                    Accept &amp; Send Treatment Plan
-                  </Button>
-                  <Button size="sm" variant="secondary" className="w-full" onClick={() => setMode("RequestInfo")}>
-                    Request More Info
-                  </Button>
-                  <Button size="sm" variant="secondary" className="w-full text-danger-600" onClick={() => setMode("Decline")}>
-                    Decline
-                  </Button>
-                </div>
-              ) : (
-                <form onSubmit={handleDecision} className="flex flex-col gap-3">
-                  {mode === "Accept" ? (
-                    <>
-                      <textarea
-                        required
-                        rows={3}
-                        placeholder="Treatment plan summary"
-                        value={treatmentPlan}
-                        onChange={(e) => setTreatmentPlan(e.target.value)}
-                        className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          required
-                          type="number"
-                          placeholder="Min cost $"
-                          value={costMin}
-                          onChange={(e) => setCostMin(e.target.value)}
-                          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                        />
-                        <input
-                          required
-                          type="number"
-                          placeholder="Max cost $"
-                          value={costMax}
-                          onChange={(e) => setCostMax(e.target.value)}
-                          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <textarea
-                      required
-                      rows={3}
-                      placeholder={mode === "Decline" ? "Reason for declining" : "What information is needed?"}
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                    />
-                  )}
-                  <div className="flex gap-2">
-                    <Button type="submit" size="sm" className="flex-1" disabled={submitting}>
-                      {submitting ? "Submitting…" : "Confirm"}
-                    </Button>
-                    <Button type="button" size="sm" variant="secondary" onClick={() => setMode(null)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              )}
-              <p className="mt-3 text-xs text-neutral-500">SLA target: respond within 3 business days of submission.</p>
-            </>
-          ) : (
-            <p className="text-sm text-neutral-500">This case has already been decided ({statusLabel(application.status)}).</p>
-          )}
+          <h2 className="mb-3 font-bold text-neutral-900">Status</h2>
+          <p className="text-sm text-neutral-700">{statusLabel(application.status)}</p>
+          <p className="mt-3 text-xs text-neutral-500">
+            The Asia Health Link case team reviews and decides on applications. You&apos;ll
+            be notified here once a decision is made.
+          </p>
         </aside>
       </div>
     </div>

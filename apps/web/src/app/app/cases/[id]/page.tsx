@@ -18,6 +18,7 @@ import {
   sendCaseMessage,
   listInvoices,
   payInvoice,
+  getInvitationLetter,
   listMyHotelBookings,
   listTransfers,
   requestTransfer,
@@ -28,6 +29,7 @@ import {
   type ChecklistItem,
   type CaseMessage,
   type Invoice,
+  type InvitationLetter,
   type HotelBooking,
   type Transfer,
 } from "@/lib/api";
@@ -46,6 +48,32 @@ const invoiceStatusTone = {
   Cancelled: "neutral",
 } as const;
 
+type StageState = "done" | "current" | "upcoming";
+
+function deriveStages(application: Application, depositPaid: boolean, letterIssued: boolean) {
+  if (application.status === "Declined") {
+    return [
+      { label: "Submitted", state: "done" as StageState },
+      { label: "Reviewed", state: "done" as StageState },
+      { label: "Declined", state: "current" as StageState },
+    ];
+  }
+
+  const accepted = application.status === "Accepted" || application.status === "Completed";
+  const completed = application.status === "Completed";
+
+  const stages: { label: string; state: StageState }[] = [
+    { label: "Submitted", state: "done" },
+    { label: "Under Review", state: accepted ? "done" : "current" },
+    { label: "Accepted", state: accepted ? "done" : "upcoming" },
+    { label: "Deposit Paid", state: depositPaid ? "done" : accepted ? "current" : "upcoming" },
+    { label: "Approval Letter Sent", state: letterIssued ? "done" : depositPaid ? "current" : "upcoming" },
+    { label: "Visa Application", state: completed ? "done" : letterIssued ? "current" : "upcoming" },
+    { label: "Completed", state: completed ? "done" : "upcoming" },
+  ];
+  return stages;
+}
+
 export default function CaseDetailPage() {
   const params = useParams<{ id: string }>();
   const applicationId = params.id;
@@ -56,6 +84,7 @@ export default function CaseDetailPage() {
   const [documents, setDocuments] = useState<ChecklistItem[]>([]);
   const [messages, setMessages] = useState<CaseMessage[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invitationLetter, setInvitationLetter] = useState<InvitationLetter | null>(null);
   const [hotelBookings, setHotelBookings] = useState<HotelBooking[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [messageText, setMessageText] = useState("");
@@ -66,11 +95,12 @@ export default function CaseDetailPage() {
   async function load() {
     if (!accessToken) return;
     try {
-      const [app, docs, msgs, inv, bookings, xfers] = await Promise.all([
+      const [app, docs, msgs, inv, letter, bookings, xfers] = await Promise.all([
         getApplication(accessToken, applicationId),
         listDocuments(accessToken, applicationId),
         listCaseMessages(accessToken, applicationId),
         listInvoices(accessToken, applicationId),
+        getInvitationLetter(accessToken, applicationId),
         listMyHotelBookings(accessToken),
         listTransfers(accessToken, applicationId),
       ]);
@@ -78,6 +108,7 @@ export default function CaseDetailPage() {
       setDocuments(docs);
       setMessages(msgs);
       setInvoices(inv);
+      setInvitationLetter(letter);
       setHotelBookings(bookings.filter((b) => b.applicationId === applicationId));
       setTransfers(xfers);
       const h = await getHospital(app.hospitalId);
@@ -137,6 +168,8 @@ export default function CaseDetailPage() {
   if (application === null) notFound();
 
   const displayStatus = statusLabel(application.status) as CaseStatus;
+  const depositPaid = invoices.some((inv) => inv.description === "Booking deposit" && inv.status === "Paid");
+  const stages = deriveStages(application, depositPaid, invitationLetter !== null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -150,6 +183,35 @@ export default function CaseDetailPage() {
             <p className="text-sm text-neutral-500">{application.specialtySlug}</p>
           </div>
           <StatusChip status={displayStatus} />
+        </div>
+
+        <div className="mt-5 flex items-start gap-1 overflow-x-auto pb-1">
+          {stages.map((s, i) => (
+            <div key={s.label} className="flex min-w-[92px] flex-1 flex-col items-center gap-1 text-center">
+              <div className="flex w-full items-center">
+                <span
+                  className={`h-0.5 flex-1 ${i === 0 ? "invisible" : s.state === "upcoming" ? "bg-neutral-200" : "bg-primary-600"}`}
+                />
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    s.state === "done"
+                      ? "bg-primary-600 text-white"
+                      : s.state === "current"
+                        ? "border-2 border-primary-600 text-primary-700"
+                        : "bg-neutral-100 text-neutral-400"
+                  }`}
+                >
+                  {s.state === "done" ? "✓" : i + 1}
+                </span>
+                <span
+                  className={`h-0.5 flex-1 ${i === stages.length - 1 ? "invisible" : s.state === "done" ? "bg-primary-600" : "bg-neutral-200"}`}
+                />
+              </div>
+              <p className={`text-xs font-semibold ${s.state === "upcoming" ? "text-neutral-400" : "text-neutral-800"}`}>
+                {s.label}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -357,6 +419,22 @@ export default function CaseDetailPage() {
           ))}
           {invoices.length === 0 ? <p className="text-sm text-neutral-500">No invoices yet.</p> : null}
         </div>
+
+        <h2 className="mt-6 mb-3 font-bold text-neutral-900">Invitation letter</h2>
+        {invitationLetter ? (
+          <a
+            href={absoluteFileUrl(invitationLetter.downloadUrl)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block rounded-md border border-success-200 bg-success-50 px-3 py-2 text-sm font-semibold text-success-700"
+          >
+            View your invitation letter
+          </a>
+        ) : (
+          <p className="text-sm text-neutral-500">
+            Issued once your case is accepted and the booking deposit is paid.
+          </p>
+        )}
       </section>
     </div>
   );

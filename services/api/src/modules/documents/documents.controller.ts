@@ -49,6 +49,11 @@ export class DocumentsController {
     return this.documentsService.verify(user, applicationId, documentId, dto);
   }
 
+  @Get("invitation-letter")
+  getInvitationLetter(@CurrentUser() user: AuthenticatedUser, @Param("applicationId") applicationId: string) {
+    return this.documentsService.getInvitationLetter(user, applicationId);
+  }
+
   @Post("invitation-letter")
   generateInvitationLetter(@CurrentUser() user: AuthenticatedUser, @Param("applicationId") applicationId: string) {
     return this.documentsService.generateInvitationLetter(user, applicationId);

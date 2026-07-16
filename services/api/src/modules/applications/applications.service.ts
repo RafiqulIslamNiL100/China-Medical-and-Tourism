@@ -143,14 +143,13 @@ export class ApplicationsService {
     };
   }
 
+  // BR-updated: case decisions (accept/request-info/decline) belong to the internal
+  // case team, not the hospital — hospital_staff no longer has a decide() path at all.
   async decide(user: AuthenticatedUser, applicationId: string, dto: ApplicationDecisionDto) {
-    const staff = await this.requireHospitalStaff(user.userId);
+    this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
     const application = await this.prisma.application.findUnique({ where: { id: applicationId } });
     if (!application || application.deletedAt) {
       throw AppException.notFound("CASE_NOT_FOUND", "Application not found.");
-    }
-    if (application.hospitalId !== staff.hospitalId) {
-      throw AppException.forbidden();
     }
 
     if (dto.decision === "Accept" && !dto.treatmentPlan) {

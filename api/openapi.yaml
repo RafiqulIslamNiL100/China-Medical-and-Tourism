@@ -1156,7 +1156,7 @@ paths:
     post:
       operationId: postApplicationsByApplicationIdDecision
       tags: [Applications]
-      summary: Accept / request info / decline an application (hospital_staff only) (FR-APP-04)
+      summary: Accept / request info / decline an application (case_manager/admin only) (FR-APP-04)
       requestBody:
         required: true
         content:
@@ -1374,6 +1374,18 @@ paths:
   /applications/{applicationId}/invitation-letter:
     parameters:
       - { $ref: "#/components/parameters/ApplicationIdParam" }
+    get:
+      operationId: getApplicationsByApplicationIdInvitationLetter
+      tags: [Documents]
+      summary: Fetch the issued invitation letter for a case, if one exists
+      responses:
+        "200":
+          description: The letter, or null if none has been issued yet.
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf: [{ $ref: "#/components/schemas/InvitationLetter" }]
     post:
       operationId: postApplicationsByApplicationIdInvitationLetter
       tags: [Documents]
