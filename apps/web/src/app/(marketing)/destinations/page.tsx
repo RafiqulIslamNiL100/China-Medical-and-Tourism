@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Container, PageHero } from "@/components/Section";
-import { cities } from "@/data/hospitals";
+import { listCities } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Destinations",
-  description: "Explore Beijing, Shanghai, Guangzhou, and Xi'an — our partner destination cities.",
+  description: "Explore our partner destination cities across Asia.",
 };
 
-export default function DestinationsPage() {
+export default async function DestinationsPage() {
+  const cities = await listCities();
+
   return (
     <>
       <PageHero

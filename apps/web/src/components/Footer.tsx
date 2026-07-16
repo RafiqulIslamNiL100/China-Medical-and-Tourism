@@ -4,8 +4,8 @@ const columns = [
   {
     title: "Discover",
     links: [
+      { href: "/specialties", label: "Treatments" },
       { href: "/hospitals", label: "Hospitals" },
-      { href: "/specialties", label: "Specialties" },
       { href: "/destinations", label: "Destinations" },
     ],
   },
