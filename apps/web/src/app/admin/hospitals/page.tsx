@@ -5,7 +5,6 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/auth-client";
 import { fmtDate } from "@/lib/portal";
-import { specialties } from "@/data/hospitals";
 import {
   listModerationQueue,
   resolveModerationItem,
@@ -18,12 +17,15 @@ import {
   adminCreatePackage,
   listCitiesAdmin,
   createCity,
+  listSpecialties,
+  createSpecialty,
   ApiError,
   type ModerationItem,
   type Hospital,
   type Doctor,
   type TreatmentPackage,
   type City,
+  type Specialty,
 } from "@/lib/api";
 
 const STATUSES = ["Draft", "PendingApproval", "Published", "Rejected"] as const;
@@ -36,6 +38,7 @@ type HospitalFormState = {
   description: string;
   richProfileMarkdown: string;
   priceTier: string;
+  specialtySlugs: string[];
   accreditations: string;
   languages: string;
   facilities: string;
@@ -45,6 +48,10 @@ type HospitalFormState = {
 type CityFormState = { slug: string; name: string; tagline: string; climate: string };
 
 const emptyCityForm: CityFormState = { slug: "", name: "", tagline: "", climate: "" };
+
+type SpecialtyFormState = { slug: string; name: string; blurb: string };
+
+const emptySpecialtyForm: SpecialtyFormState = { slug: "", name: "", blurb: "" };
 
 type DoctorFormState = {
   slug: string;
@@ -72,6 +79,7 @@ const emptyHospitalForm: HospitalFormState = {
   description: "",
   richProfileMarkdown: "",
   priceTier: "$$$",
+  specialtySlugs: [],
   accreditations: "",
   languages: "",
   facilities: "",
@@ -81,7 +89,7 @@ const emptyHospitalForm: HospitalFormState = {
 const emptyDoctorForm: DoctorFormState = {
   slug: "",
   name: "",
-  specialtySlug: specialties[0].slug,
+  specialtySlug: "",
   credentials: "",
   yearsExperience: "",
   languages: "",
@@ -90,7 +98,7 @@ const emptyDoctorForm: DoctorFormState = {
 
 const emptyPackageForm: PackageFormState = {
   name: "",
-  specialtySlug: specialties[0].slug,
+  specialtySlug: "",
   description: "",
   priceMinUsd: "",
   priceMaxUsd: "",
@@ -118,6 +126,10 @@ export default function AdminHospitalModerationPage() {
   const [creatingCity, setCreatingCity] = useState(false);
   const [cityForm, setCityForm] = useState<CityFormState>(emptyCityForm);
 
+  const [specialtyList, setSpecialtyList] = useState<Specialty[]>([]);
+  const [creatingSpecialty, setCreatingSpecialty] = useState(false);
+  const [specialtyForm, setSpecialtyForm] = useState<SpecialtyFormState>(emptySpecialtyForm);
+
   const [creatingHospital, setCreatingHospital] = useState(false);
   const [hospitalForm, setHospitalForm] = useState<HospitalFormState>(emptyHospitalForm);
   const [expandedHospitalId, setExpandedHospitalId] = useState<string | null>(null);
@@ -135,11 +147,19 @@ export default function AdminHospitalModerationPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    Promise.all([listModerationQueue(accessToken), refreshHospitals(accessToken), listCitiesAdmin(accessToken)])
-      .then(([queue, , cityList]) => {
+    Promise.all([
+      listModerationQueue(accessToken),
+      refreshHospitals(accessToken),
+      listCitiesAdmin(accessToken),
+      listSpecialties(),
+    ])
+      .then(([queue, , cityList, specialtiesList]) => {
         setItems(queue.filter((i) => !i.resolvedAt));
         setCities(cityList);
+        setSpecialtyList(specialtiesList);
         setHospitalForm((f) => (f.citySlug ? f : { ...f, citySlug: cityList[0]?.slug ?? "" }));
+        setDoctorForm((f) => (f.specialtySlug ? f : { ...f, specialtySlug: specialtiesList[0]?.slug ?? "" }));
+        setPackageForm((f) => (f.specialtySlug ? f : { ...f, specialtySlug: specialtiesList[0]?.slug ?? "" }));
       })
       .finally(() => setLoading(false));
   }, [accessToken]);
@@ -190,6 +210,26 @@ export default function AdminHospitalModerationPage() {
     }
   }
 
+  async function handleCreateSpecialty(e: React.FormEvent) {
+    e.preventDefault();
+    if (!accessToken) return;
+    setError(null);
+    try {
+      const created = await createSpecialty(accessToken, {
+        slug: specialtyForm.slug,
+        name: specialtyForm.name,
+        blurb: specialtyForm.blurb || undefined,
+      });
+      setSpecialtyList((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setDoctorForm((f) => (f.specialtySlug ? f : { ...f, specialtySlug: created.slug }));
+      setPackageForm((f) => (f.specialtySlug ? f : { ...f, specialtySlug: created.slug }));
+      setSpecialtyForm(emptySpecialtyForm);
+      setCreatingSpecialty(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not create specialty.");
+    }
+  }
+
   async function handleCreateHospital(e: React.FormEvent) {
     e.preventDefault();
     if (!accessToken) return;
@@ -202,6 +242,7 @@ export default function AdminHospitalModerationPage() {
         description: hospitalForm.description,
         richProfileMarkdown: hospitalForm.richProfileMarkdown || undefined,
         priceTier: hospitalForm.priceTier,
+        specialtySlugs: hospitalForm.specialtySlugs,
         accreditations: splitList(hospitalForm.accreditations),
         languages: splitList(hospitalForm.languages),
         facilities: splitList(hospitalForm.facilities),
@@ -229,6 +270,7 @@ export default function AdminHospitalModerationPage() {
       description: hospital.description,
       richProfileMarkdown: hospital.richProfileMarkdown ?? "",
       priceTier: hospital.priceTier,
+      specialtySlugs: hospital.specialtySlugs ?? [],
       accreditations: hospital.accreditations.join(", "),
       languages: hospital.languages.join(", "),
       facilities: hospital.facilities.join(", "),
@@ -256,6 +298,7 @@ export default function AdminHospitalModerationPage() {
         richProfileMarkdown: editForm.richProfileMarkdown,
         citySlug: editForm.citySlug,
         priceTier: editForm.priceTier,
+        specialtySlugs: editForm.specialtySlugs,
         accreditations: splitList(editForm.accreditations),
         languages: splitList(editForm.languages),
         facilities: splitList(editForm.facilities),
@@ -327,6 +370,9 @@ export default function AdminHospitalModerationPage() {
             <Button size="sm" variant="secondary" onClick={() => setCreatingCity((v) => !v)}>
               {creatingCity ? "Cancel" : "New City"}
             </Button>
+            <Button size="sm" variant="secondary" onClick={() => setCreatingSpecialty((v) => !v)}>
+              {creatingSpecialty ? "Cancel" : "New Specialty"}
+            </Button>
             <Button size="sm" onClick={() => setCreatingHospital((v) => !v)}>
               {creatingHospital ? "Cancel" : "New Hospital"}
             </Button>
@@ -340,6 +386,15 @@ export default function AdminHospitalModerationPage() {
             <input placeholder="Tagline (optional)" value={cityForm.tagline} onChange={(e) => setCityForm((f) => ({ ...f, tagline: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
             <input placeholder="Climate (optional)" value={cityForm.climate} onChange={(e) => setCityForm((f) => ({ ...f, climate: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
             <Button type="submit" size="sm" className="w-fit sm:col-span-2">Create City</Button>
+          </form>
+        ) : null}
+
+        {creatingSpecialty ? (
+          <form onSubmit={handleCreateSpecialty} className="grid gap-3 rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm sm:grid-cols-2">
+            <input required placeholder="Slug (e.g. neurosurgery)" value={specialtyForm.slug} onChange={(e) => setSpecialtyForm((f) => ({ ...f, slug: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+            <input required placeholder="Name (e.g. Neurosurgery)" value={specialtyForm.name} onChange={(e) => setSpecialtyForm((f) => ({ ...f, name: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
+            <input placeholder="Blurb (optional)" value={specialtyForm.blurb} onChange={(e) => setSpecialtyForm((f) => ({ ...f, blurb: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2" />
+            <Button type="submit" size="sm" className="w-fit sm:col-span-2">Create Specialty</Button>
           </form>
         ) : null}
 
@@ -363,6 +418,31 @@ export default function AdminHospitalModerationPage() {
                 Full Profile (optional — Markdown, supports tables via GFM: | Col | Col |)
               </label>
               <textarea placeholder="## Section heading&#10;&#10;| Department | Notes |&#10;|---|---|&#10;| Cardiology | ... |" rows={10} value={hospitalForm.richProfileMarkdown} onChange={(e) => setHospitalForm((f) => ({ ...f, richProfileMarkdown: e.target.value }))} className="w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-semibold text-neutral-500">
+                Specialties treated (drives the patient application wizard&apos;s hospital suggestions)
+              </label>
+              <div className="flex flex-wrap gap-3 rounded-md border border-neutral-300 p-3">
+                {specialtyList.map((s) => (
+                  <label key={s.slug} className="flex items-center gap-1.5 text-xs text-neutral-700">
+                    <input
+                      type="checkbox"
+                      checked={hospitalForm.specialtySlugs.includes(s.slug)}
+                      onChange={(e) =>
+                        setHospitalForm((f) => ({
+                          ...f,
+                          specialtySlugs: e.target.checked
+                            ? [...f.specialtySlugs, s.slug]
+                            : f.specialtySlugs.filter((slug) => slug !== s.slug),
+                        }))
+                      }
+                    />
+                    {s.name}
+                  </label>
+                ))}
+                {specialtyList.length === 0 ? <p className="text-xs text-neutral-500">No specialties yet — add one above.</p> : null}
+              </div>
             </div>
             <input placeholder="Accreditations (comma-separated)" value={hospitalForm.accreditations} onChange={(e) => setHospitalForm((f) => ({ ...f, accreditations: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
             <input placeholder="Languages (comma-separated)" value={hospitalForm.languages} onChange={(e) => setHospitalForm((f) => ({ ...f, languages: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
@@ -417,6 +497,33 @@ export default function AdminHospitalModerationPage() {
                       </label>
                       <textarea rows={10} value={editForm.richProfileMarkdown} onChange={(e) => setEditForm((f) => f && { ...f, richProfileMarkdown: e.target.value })} className="w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-xs" />
                     </div>
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs font-semibold text-neutral-500">
+                        Specialties treated (drives the patient application wizard's hospital suggestions)
+                      </label>
+                      <div className="flex flex-wrap gap-3 rounded-md border border-neutral-300 p-3">
+                        {specialtyList.map((s) => (
+                          <label key={s.slug} className="flex items-center gap-1.5 text-xs text-neutral-700">
+                            <input
+                              type="checkbox"
+                              checked={editForm.specialtySlugs.includes(s.slug)}
+                              onChange={(e) =>
+                                setEditForm((f) =>
+                                  f && {
+                                    ...f,
+                                    specialtySlugs: e.target.checked
+                                      ? [...f.specialtySlugs, s.slug]
+                                      : f.specialtySlugs.filter((slug) => slug !== s.slug),
+                                  },
+                                )
+                              }
+                            />
+                            {s.name}
+                          </label>
+                        ))}
+                        {specialtyList.length === 0 ? <p className="text-xs text-neutral-500">No specialties yet — add one above.</p> : null}
+                      </div>
+                    </div>
                     <input value={editForm.accreditations} onChange={(e) => setEditForm((f) => f && { ...f, accreditations: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" placeholder="Accreditations (comma-separated)" />
                     <input value={editForm.languages} onChange={(e) => setEditForm((f) => f && { ...f, languages: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" placeholder="Languages (comma-separated)" />
                     <input value={editForm.facilities} onChange={(e) => setEditForm((f) => f && { ...f, facilities: e.target.value })} className="rounded-md border border-neutral-300 px-3 py-2 text-sm sm:col-span-2" placeholder="Facilities (comma-separated)" />
@@ -435,7 +542,7 @@ export default function AdminHospitalModerationPage() {
                         <input required placeholder="Slug" value={doctorForm.slug} onChange={(e) => setDoctorForm((f) => ({ ...f, slug: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
                         <input required placeholder="Name" value={doctorForm.name} onChange={(e) => setDoctorForm((f) => ({ ...f, name: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
                         <select value={doctorForm.specialtySlug} onChange={(e) => setDoctorForm((f) => ({ ...f, specialtySlug: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">
-                          {specialties.map((s) => (
+                          {specialtyList.map((s) => (
                             <option key={s.slug} value={s.slug}>{s.name}</option>
                           ))}
                         </select>
@@ -465,7 +572,7 @@ export default function AdminHospitalModerationPage() {
                       <form onSubmit={(e) => handleAddPackage(e, h.id)} className="mt-3 grid gap-2 rounded-md border border-neutral-200 p-3 sm:grid-cols-2">
                         <input required placeholder="Name" value={packageForm.name} onChange={(e) => setPackageForm((f) => ({ ...f, name: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm" />
                         <select value={packageForm.specialtySlug} onChange={(e) => setPackageForm((f) => ({ ...f, specialtySlug: e.target.value }))} className="rounded-md border border-neutral-300 px-3 py-2 text-sm">
-                          {specialties.map((s) => (
+                          {specialtyList.map((s) => (
                             <option key={s.slug} value={s.slug}>{s.name}</option>
                           ))}
                         </select>

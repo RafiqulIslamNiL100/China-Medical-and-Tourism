@@ -248,12 +248,23 @@ components:
           nullable: true
           description: Optional long-form profile in GFM Markdown (headings, tables, lists) for hospitals with detailed department directories, key-discipline rosters, etc.
         priceTier: { type: string, enum: ["$$", "$$$", "$$$$"] }
+        specialtySlugs:
+          type: array
+          items: { type: string }
+          description: Specialties this hospital treats directly, independent of any listed doctors/packages. Drives the patient application wizard's hospital suggestions.
         accreditations: { type: array, items: { type: string } }
         languages: { type: array, items: { type: string } }
         facilities: { type: array, items: { type: string } }
         rating: { type: number, format: float }
         reviewCount: { type: integer }
         status: { type: string, enum: [Draft, PendingApproval, Published, Rejected] }
+
+    Specialty:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        blurb: { type: string, nullable: true }
 
     Doctor:
       type: object
@@ -891,6 +902,21 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Hospital" }
                   meta: { $ref: "#/components/schemas/PaginatedMeta" }
+
+  /specialties:
+    get:
+      operationId: getSpecialties
+      tags: [Hospitals]
+      summary: List all specialties (public taxonomy used by hospital search and the patient application wizard)
+      security: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Specialty" }
 
   /hospitals/mine:
     get:
@@ -2316,6 +2342,7 @@ paths:
                 description: { type: string }
                 richProfileMarkdown: { type: string, description: "Optional long-form profile in GFM Markdown." }
                 priceTier: { type: string, example: "$$$" }
+                specialtySlugs: { type: array, items: { type: string } }
                 accreditations: { type: array, items: { type: string } }
                 languages: { type: array, items: { type: string } }
                 facilities: { type: array, items: { type: string } }
@@ -2348,6 +2375,7 @@ paths:
                 richProfileMarkdown: { type: string, description: "Optional long-form profile in GFM Markdown." }
                 citySlug: { type: string }
                 priceTier: { type: string }
+                specialtySlugs: { type: array, items: { type: string } }
                 accreditations: { type: array, items: { type: string } }
                 languages: { type: array, items: { type: string } }
                 facilities: { type: array, items: { type: string } }
@@ -2358,6 +2386,29 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Hospital" }
+
+  /admin/specialties:
+    post:
+      operationId: postAdminSpecialties
+      tags: [Admin]
+      summary: Create a specialty (admin only) — required before it can be attached to a hospital or matched by the patient application wizard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name]
+              properties:
+                slug: { type: string }
+                name: { type: string }
+                blurb: { type: string }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Specialty" }
 
   /admin/hospitals/{hospitalId}/doctors:
     parameters:

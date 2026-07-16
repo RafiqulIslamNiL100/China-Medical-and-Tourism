@@ -70,6 +70,18 @@ export class CreateCityDto {
   climate?: string;
 }
 
+export class CreateSpecialtyDto {
+  @IsString()
+  slug!: string;
+
+  @IsString()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  blurb?: string;
+}
+
 export class ListAuditLogQuery {
   @IsOptional()
   @IsString()

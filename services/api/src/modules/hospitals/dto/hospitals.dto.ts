@@ -171,6 +171,11 @@ export class CreateHospitalDto {
   @IsString()
   priceTier!: string;
 
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  specialtySlugs?: string[];
+
   @IsArray()
   @IsString({ each: true })
   accreditations!: string[];
@@ -209,6 +214,11 @@ export class AdminUpdateHospitalDto {
   @IsOptional()
   @IsString()
   priceTier?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  specialtySlugs?: string[];
 
   @IsOptional()
   @IsArray()
