@@ -5,7 +5,7 @@ import { cities } from "@/data/hospitals";
 
 export const metadata: Metadata = {
   title: "Destinations",
-  description: "Explore Beijing, Shanghai, and Guangzhou — our partner destination cities.",
+  description: "Explore Beijing, Shanghai, Guangzhou, and Xi'an — our partner destination cities.",
 };
 
 export default function DestinationsPage() {

@@ -54,6 +54,22 @@ export class UpdateSettingDto {
   value: unknown;
 }
 
+export class CreateCityDto {
+  @IsString()
+  slug!: string;
+
+  @IsString()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  tagline?: string;
+
+  @IsOptional()
+  @IsString()
+  climate?: string;
+}
+
 export class ListAuditLogQuery {
   @IsOptional()
   @IsString()

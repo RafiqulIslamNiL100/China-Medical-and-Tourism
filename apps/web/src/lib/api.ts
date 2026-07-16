@@ -81,12 +81,20 @@ export type AuthTokens = {
   expiresIn: number;
 };
 
+export type City = {
+  slug: string;
+  name: string;
+  tagline?: string | null;
+  climate?: string | null;
+};
+
 export type Hospital = {
   id: string;
   slug: string;
   name: string;
   citySlug: string;
   description: string;
+  richProfileMarkdown?: string | null;
   priceTier: string;
   accreditations: string[];
   languages: string[];
@@ -798,6 +806,16 @@ export function listAdminUsers(accessToken: string, query: { role?: Role; cursor
   return request<Paginated<User>>("/admin/users", { accessToken, query });
 }
 
+// --- Admin: cities -------------------------------------------------------------------------
+
+export function listCitiesAdmin(accessToken: string) {
+  return request<City[]>("/admin/cities", { accessToken });
+}
+
+export function createCity(accessToken: string, input: { slug: string; name: string; tagline?: string; climate?: string }) {
+  return request<City>("/admin/cities", { method: "POST", body: input, accessToken });
+}
+
 // --- Admin: hospitals / doctors / packages (direct CRUD, no moderation queue) ------------------
 
 export function listAllHospitalsAdmin(accessToken: string) {
@@ -811,6 +829,7 @@ export function createHospital(
     name: string;
     citySlug: string;
     description: string;
+    richProfileMarkdown?: string;
     priceTier: string;
     accreditations: string[];
     languages: string[];

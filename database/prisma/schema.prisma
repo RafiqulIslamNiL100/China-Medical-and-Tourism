@@ -188,13 +188,13 @@ enum VerificationCodePurpose {
 // (consumedAt) and time-limited (expiresAt) per the 10-minute window fixed in
 // docs/03-architecture/05-auth-security-architecture.md §1.
 model VerificationCode {
-  id          String                   @id @default(uuid())
-  userId      String
-  codeHash    String
-  purpose     VerificationCodePurpose
-  expiresAt   DateTime
-  consumedAt  DateTime?
-  createdAt   DateTime                 @default(now())
+  id         String                  @id @default(uuid())
+  userId     String
+  codeHash   String
+  purpose    VerificationCodePurpose
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime                @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -263,20 +263,24 @@ model Specialty {
 }
 
 model Hospital {
-  id             String                @id @default(uuid())
-  slug           String                @unique
-  name           String
-  citySlug       String
-  description    String
-  priceTier      String // "$$" | "$$$" | "$$$$" — small fixed vocabulary, not worth a table
-  accreditations String[]
-  languages      String[]
-  facilities     String[]
-  rating         Decimal               @default(0) @db.Decimal(2, 1)
-  reviewCount    Int                   @default(0)
-  status         HospitalListingStatus @default(Draft)
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  id                  String                @id @default(uuid())
+  slug                String                @unique
+  name                String
+  citySlug            String
+  description         String
+  // Optional long-form profile (GFM Markdown — headings, tables, lists) for hospitals
+  // with detailed department directories, key-discipline rosters, etc. beyond what the
+  // short `description` can hold. Rendered as-is on the hospital detail page.
+  richProfileMarkdown String?
+  priceTier           String // "$$" | "$$$" | "$$$$" — small fixed vocabulary, not worth a table
+  accreditations      String[]
+  languages           String[]
+  facilities          String[]
+  rating              Decimal               @default(0) @db.Decimal(2, 1)
+  reviewCount         Int                   @default(0)
+  status              HospitalListingStatus @default(Draft)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
   city            City                     @relation(fields: [citySlug], references: [slug])
   departments     Department[]
