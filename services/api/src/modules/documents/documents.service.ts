@@ -114,6 +114,19 @@ export class DocumentsService {
     return this.withDownloadUrl(updated);
   }
 
+  /** Returns null (not a 404) when no letter has been issued yet, so the patient's
+   * case-stage tracker and the ops console can treat "not issued yet" as normal state
+   * rather than an error. */
+  async getInvitationLetter(user: AuthenticatedUser, applicationId: string) {
+    await this.requireAccess(user, applicationId);
+    const letter = await this.prisma.invitationLetter.findFirst({
+      where: { applicationId },
+      orderBy: { issuedAt: "desc" },
+    });
+    if (!letter) return null;
+    return { ...letter, downloadUrl: await this.storage.getDownloadUrl(letter.fileStorageKey) };
+  }
+
   async generateInvitationLetter(user: AuthenticatedUser, applicationId: string) {
     this.requireRole(user, [UserRole.case_manager, UserRole.admin]);
     const application = await this.prisma.application.findUnique({ where: { id: applicationId } });

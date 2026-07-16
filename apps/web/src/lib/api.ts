@@ -584,8 +584,14 @@ export function verifyDocument(accessToken: string, applicationId: string, docum
   });
 }
 
+export type InvitationLetter = { id: string; downloadUrl: string; templateVersion: string; issuedAt: string };
+
+export function getInvitationLetter(accessToken: string, applicationId: string) {
+  return request<InvitationLetter | null>(`/applications/${applicationId}/invitation-letter`, { accessToken });
+}
+
 export function generateInvitationLetter(accessToken: string, applicationId: string) {
-  return request<{ id: string; downloadUrl: string }>(`/applications/${applicationId}/invitation-letter`, {
+  return request<InvitationLetter>(`/applications/${applicationId}/invitation-letter`, {
     method: "POST",
     accessToken,
   });
