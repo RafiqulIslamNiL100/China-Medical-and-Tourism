@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Button } from "./Button";
 
 const navLinks = [
+  { href: "/specialties", label: "Treatments" },
   { href: "/hospitals", label: "Hospitals" },
-  { href: "/specialties", label: "Specialties" },
   { href: "/destinations", label: "Destinations" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/blog", label: "Blog" },

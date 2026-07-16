@@ -3,8 +3,8 @@ import { Button } from "@/components/Button";
 import { Container } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
 import { Stars } from "@/components/Stars";
-import { hospitals, specialties, cities, testimonials } from "@/data/hospitals";
-import { listSpecialties } from "@/lib/api";
+import { hospitals, specialties, testimonials } from "@/data/hospitals";
+import { listSpecialties, listCities } from "@/lib/api";
 
 const steps = [
   {
@@ -30,6 +30,7 @@ export default async function HomePage() {
   const topReviews = testimonials.slice(0, 3);
   const allSpecialties = await listSpecialties();
   const treatmentPreview = allSpecialties.slice(0, 8);
+  const destinationCities = await listCities();
 
   return (
     <>
@@ -48,8 +49,8 @@ export default async function HomePage() {
               manager.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button href="/hospitals" size="lg">
-                Find a Hospital
+              <Button href="/app/apply" size="lg">
+                Start Application
               </Button>
               <Button href="/how-it-works" size="lg" variant="secondary">
                 How It Works
@@ -60,10 +61,10 @@ export default async function HomePage() {
                 <strong className="text-neutral-900">500+</strong> patients served
               </span>
               <span>
-                <strong className="text-neutral-900">3</strong> destination cities
+                <strong className="text-neutral-900">10+</strong> destination cities
               </span>
               <span>
-                <strong className="text-neutral-900">4.7</strong> average rating
+                <strong className="text-neutral-900">4.7+</strong> average rating
               </span>
             </div>
           </div>
@@ -192,7 +193,7 @@ export default async function HomePage() {
             Explore destinations
           </h2>
           <div className="grid gap-5 sm:grid-cols-3">
-            {cities.map((c) => (
+            {destinationCities.map((c) => (
               <Link
                 key={c.slug}
                 href={`/destinations/${c.slug}`}
