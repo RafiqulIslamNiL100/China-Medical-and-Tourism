@@ -918,6 +918,21 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Specialty" }
 
+  /cities:
+    get:
+      operationId: getCities
+      tags: [Hospitals]
+      summary: List all cities (public taxonomy used by the hospital directory and specialty pages)
+      security: []
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/City" }
+
   /hospitals/mine:
     get:
       operationId: getHospitalsMine

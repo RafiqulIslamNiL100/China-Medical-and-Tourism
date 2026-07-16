@@ -47,6 +47,10 @@ export class HospitalsService {
     return this.prisma.specialty.findMany({ orderBy: { name: "asc" } });
   }
 
+  async listCities() {
+    return this.prisma.city.findMany({ orderBy: { name: "asc" } });
+  }
+
   /** The hospital this staff member belongs to — Screen 20's "my hospital" context. */
   async getMine(staffUserId: string) {
     const staff = await this.prisma.hospitalStaff.findUnique({
