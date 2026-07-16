@@ -190,11 +190,14 @@ export class AuthService {
         },
       });
       const resetToken = `${record.id}.${secret}`;
+      const frontendUrl = this.config.get<string>("FRONTEND_URL") ?? "http://localhost:3000";
+      const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
       await this.notifications.notify({
         userId: user.id,
         title: "Reset your password",
-        body: `Use this link within ${RESET_TOKEN_TTL_MINUTES} minutes to reset your password: /reset-password?token=${resetToken}`,
+        body: `Use this link within ${RESET_TOKEN_TTL_MINUTES} minutes to reset your password: ${resetUrl}`,
         category: "account_security",
+        linkUrl: `/reset-password?token=${resetToken}`,
       });
     }
   }

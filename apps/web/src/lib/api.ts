@@ -391,6 +391,22 @@ export function refreshTokens(refreshToken: string) {
   return request<AuthTokens>("/auth/refresh", { method: "POST", body: { refreshToken } });
 }
 
+/** Revokes the refresh token server-side — without this, logging out only forgets
+ * the token locally and it would remain valid indefinitely if it ever leaked. */
+export function logout(accessToken: string, refreshToken: string) {
+  return request<void>("/auth/logout", { method: "POST", body: { refreshToken }, accessToken });
+}
+
+/** Always resolves — the backend responds identically whether or not the account
+ * exists, to avoid leaking which emails/phones have accounts. */
+export function forgotPassword(emailOrPhone: string) {
+  return request<void>("/auth/forgot-password", { method: "POST", body: { emailOrPhone } });
+}
+
+export function resetPassword(input: { resetToken: string; newPassword: string }) {
+  return request<void>("/auth/reset-password", { method: "POST", body: input });
+}
+
 export function me(accessToken: string) {
   return request<User>("/me", { accessToken });
 }
