@@ -32,9 +32,13 @@ const prisma = new PrismaClient();
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || "Passw0rd!23";
 
 async function main() {
-  const alreadySeeded = await prisma.hospital.findFirst();
+  // Guard on a demo-specific hospital, NOT just any hospital: the FAH-XJTU reference
+  // hospital is inserted by the 20260716160000_seed_fah_xjtu_hospital migration (which
+  // runs via `prisma migrate deploy` on every environment), so `findFirst()` would
+  // otherwise see it and wrongly skip seeding the demo fixtures on a fresh database.
+  const alreadySeeded = await prisma.hospital.findFirst({ where: { slug: "beijing-united-family-hospital" } });
   if (alreadySeeded) {
-    console.log("Demo data already present (a Hospital row exists) — skipping seed.");
+    console.log("Demo data already present (beijing-united-family-hospital exists) — skipping seed.");
     return;
   }
 
@@ -71,7 +75,11 @@ async function main() {
   console.log(`Seeded ${cities.length} cities.`);
 
   // --- Specialties ---------------------------------------------------------
+  // skipDuplicates: several of these slugs (cardiology, oncology, orthopedics, fertility,
+  // tcm-wellness) are also inserted by the FAH-XJTU migration that runs before the seed,
+  // so without this the createMany would hit unique-constraint violations on a fresh DB.
   await prisma.specialty.createMany({
+    skipDuplicates: true,
     data: [
       { slug: "oncology", name: "Oncology", blurb: "Advanced cancer diagnostics, surgical oncology, radiotherapy, and immunotherapy." },
       { slug: "cardiology", name: "Cardiology", blurb: "Interventional cardiology, bypass surgery, and structural heart repair." },
