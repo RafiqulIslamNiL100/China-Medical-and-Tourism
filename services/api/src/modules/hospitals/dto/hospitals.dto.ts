@@ -34,6 +34,31 @@ export class SearchHospitalsQuery {
   limit?: number = 20;
 }
 
+export class SearchTreatmentsQuery {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  specialty?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+}
+
 export class SubmitHospitalChangeDto {
   @IsOptional()
   @IsString()

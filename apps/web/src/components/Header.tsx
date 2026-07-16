@@ -3,6 +3,7 @@ import { Button } from "./Button";
 
 const navLinks = [
   { href: "/hospitals", label: "Hospitals" },
+  { href: "/treatments", label: "Treatments" },
   { href: "/specialties", label: "Specialties" },
   { href: "/destinations", label: "Destinations" },
   { href: "/how-it-works", label: "How It Works" },
