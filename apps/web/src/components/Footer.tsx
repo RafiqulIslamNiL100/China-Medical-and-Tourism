@@ -7,7 +7,6 @@ const columns = [
       { href: "/hospitals", label: "Hospitals" },
       { href: "/specialties", label: "Specialties" },
       { href: "/destinations", label: "Destinations" },
-      { href: "/pricing", label: "Pricing" },
     ],
   },
   {

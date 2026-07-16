@@ -37,8 +37,8 @@ const faqGroups = [
     category: "Payments",
     items: [
       {
-        q: "Is the price I see online final?",
-        a: "No — displayed prices are estimates. Your exact cost is confirmed in writing by the hospital after reviewing your specific case.",
+        q: "When will I find out the cost of my treatment?",
+        a: "We don't publish prices online — every case is different. Your case manager shares a written cost estimate once the hospital has reviewed your specific condition.",
       },
       {
         q: "What happens if I need to cancel?",

@@ -8,7 +8,7 @@ import { searchHospitals } from "@/lib/api";
 export const metadata: Metadata = {
   title: "Find a Hospital",
   description:
-    "Browse accredited partner hospitals in Beijing, Shanghai, Guangzhou, and Xi'an by specialty, city, and price.",
+    "Browse accredited partner hospitals in Beijing, Shanghai, Guangzhou, and Xi'an by specialty and city.",
 };
 
 export default async function HospitalsPage({
@@ -26,7 +26,6 @@ export default async function HospitalsPage({
     specialties: [] as string[],
     rating: Number(h.rating),
     reviewCount: h.reviewCount,
-    priceTier: h.priceTier,
   }));
 
   return (

@@ -22,8 +22,8 @@ export default function AboutPage() {
             no transparent pricing, no accountable coordination between hospital, visa,
             and travel logistics, and no single point of contact through a stressful
             journey. We built a platform that puts a curated network of accredited
-            hospitals, a dedicated case manager, and transparent pricing behind every
-            booking.
+            hospitals and a dedicated case manager behind every booking, coordinating
+            every step from first inquiry to flight home.
           </p>
         </section>
 

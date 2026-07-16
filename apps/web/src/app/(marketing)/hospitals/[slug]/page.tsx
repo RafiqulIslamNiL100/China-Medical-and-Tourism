@@ -7,9 +7,8 @@ import { Container } from "@/components/Section";
 import { Badge, VerifiedBadge } from "@/components/Badge";
 import { Stars } from "@/components/Stars";
 import { Button } from "@/components/Button";
-import { DoctorCard } from "@/components/DoctorCard";
-import { cities, specialties } from "@/data/hospitals";
-import { searchHospitals, getHospital, listDoctors, listPackages, listHospitalReviews } from "@/lib/api";
+import { cities } from "@/data/hospitals";
+import { searchHospitals, getHospital, listHospitalReviews } from "@/lib/api";
 
 const markdownComponents = {
   h1: (props: React.ComponentPropsWithoutRef<"h1">) => (
@@ -79,16 +78,9 @@ export default async function HospitalDetailPage({
   const hospital = await findHospitalBySlug(slug);
   if (!hospital) notFound();
 
-  const [doctors, packages, reviews] = await Promise.all([
-    listDoctors(hospital.id),
-    listPackages(hospital.id),
-    listHospitalReviews(hospital.id),
-  ]);
+  const reviews = await listHospitalReviews(hospital.id);
 
   const cityLabel = cities.find((c) => c.slug === hospital.citySlug)?.name ?? hospital.citySlug;
-  const hospitalSpecialties = Array.from(
-    new Set([...doctors.map((d) => d.specialtySlug), ...packages.map((p) => p.specialtySlug)]),
-  ).map((slug) => specialties.find((s) => s.slug === slug)?.name ?? slug);
 
   return (
     <>
@@ -102,7 +94,6 @@ export default async function HospitalDetailPage({
               <Stars rating={Number(hospital.rating)} />
             </span>
             <span>{hospital.reviewCount} reviews</span>
-            <span>{hospital.priceTier}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {hospital.accreditations.map((a) => (
@@ -122,8 +113,6 @@ export default async function HospitalDetailPage({
           {[
             ["#overview", "Overview"],
             ...(hospital.richProfileMarkdown ? [["#profile", "Full Profile"]] : []),
-            ["#doctors", "Doctors"],
-            ["#packages", "Packages"],
             ["#reviews", "Reviews"],
           ].map(([href, label]) => (
             <a
@@ -142,13 +131,6 @@ export default async function HospitalDetailPage({
           <section id="overview" className="scroll-mt-32">
             <h2 className="mb-3 text-xl font-bold text-neutral-900">Overview</h2>
             <p className="text-neutral-700">{hospital.description}</p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {hospitalSpecialties.map((s) => (
-                <Badge key={s} tone="primary">
-                  {s}
-                </Badge>
-              ))}
-            </div>
             <h3 className="mt-6 mb-2 font-bold text-neutral-900">Facilities</h3>
             <ul className="grid gap-1.5 text-sm text-neutral-700 sm:grid-cols-2">
               {hospital.facilities.map((f) => (
@@ -170,59 +152,6 @@ export default async function HospitalDetailPage({
               </ReactMarkdown>
             </section>
           ) : null}
-
-          <section id="doctors" className="scroll-mt-32">
-            <h2 className="mb-4 text-xl font-bold text-neutral-900">Doctors</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {doctors.map((doc) => (
-                <DoctorCard
-                  key={doc.slug}
-                  doctor={{
-                    slug: doc.slug,
-                    name: doc.name,
-                    specialty: specialties.find((s) => s.slug === doc.specialtySlug)?.name ?? doc.specialtySlug,
-                    credentials: doc.credentials,
-                    yearsExperience: doc.yearsExperience,
-                    languages: doc.languages,
-                    bio: doc.bio,
-                  }}
-                  hospitalSlug={hospital.slug}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section id="packages" className="scroll-mt-32">
-            <h2 className="mb-4 text-xl font-bold text-neutral-900">Treatment packages</h2>
-            <div className="flex flex-col gap-4">
-              {packages.map((pkg) => (
-                <div
-                  key={pkg.id}
-                  className="rounded-[10px] border border-neutral-300 bg-white p-5 shadow-sm"
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="font-bold text-neutral-900">{pkg.name}</h3>
-                    <span className="font-semibold text-primary-700">
-                      ${Number(pkg.priceMinUsd).toLocaleString()}–$
-                      {Number(pkg.priceMaxUsd).toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-neutral-600">{pkg.description}</p>
-                  <ul className="mt-3 grid gap-1 text-sm text-neutral-700 sm:grid-cols-2">
-                    {pkg.includes.map((i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-600" />
-                        {i}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-3 text-xs text-neutral-500">
-                    Estimated price — confirmed in writing after medical review.
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
 
           <section id="reviews" className="scroll-mt-32">
             <h2 className="mb-4 text-xl font-bold text-neutral-900">Patient reviews</h2>
