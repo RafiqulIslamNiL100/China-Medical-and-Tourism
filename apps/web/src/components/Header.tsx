@@ -6,6 +6,7 @@ import { Logo } from "./Logo";
 import { useLanguage, type DictKey } from "@/lib/i18n";
 
 const navLinks: { href: string; key: DictKey }[] = [
+  { href: "/", key: "nav.home" },
   { href: "/specialties", key: "nav.treatments" },
   { href: "/hospitals", key: "nav.hospitals" },
   { href: "/destinations", key: "nav.destinations" },
