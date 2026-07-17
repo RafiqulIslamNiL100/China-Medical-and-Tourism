@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { Container, PageHero } from "@/components/Section";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "About Us",
   description: "Our mission: a transparent, coordinated path to world-class treatment in China.",
-};
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

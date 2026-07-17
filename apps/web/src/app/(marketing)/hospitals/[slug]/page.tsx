@@ -9,6 +9,7 @@ import { Stars } from "@/components/Stars";
 import { Button } from "@/components/Button";
 import { cities } from "@/data/hospitals";
 import { searchHospitals, getHospital, listHospitalReviews } from "@/lib/api";
+import { buildMetadata } from "@/lib/seo";
 
 const markdownComponents = {
   h1: (props: React.ComponentPropsWithoutRef<"h1">) => (
@@ -63,10 +64,11 @@ export async function generateMetadata({
   const { slug } = await params;
   const hospital = await findHospitalBySlug(slug);
   if (!hospital) return {};
-  return {
+  return buildMetadata({
     title: hospital.name,
     description: hospital.description,
-  };
+    path: `/hospitals/${slug}`,
+  });
 }
 
 export default async function HospitalDetailPage({

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Container, PageHero } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
 import { listCities, listSpecialties, searchHospitals } from "@/lib/api";
+import { buildMetadata } from "@/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -13,7 +14,11 @@ export async function generateMetadata({
   const cities = await listCities();
   const city = cities.find((c) => c.slug === slug);
   if (!city) return {};
-  return { title: city.name, description: city.tagline ?? undefined };
+  return buildMetadata({
+    title: city.name,
+    description: city.tagline ?? undefined,
+    path: `/destinations/${slug}`,
+  });
 }
 
 export default async function DestinationDetailPage({

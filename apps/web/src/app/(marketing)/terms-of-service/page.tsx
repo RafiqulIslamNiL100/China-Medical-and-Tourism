@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { Container, PageHero } from "@/components/Section";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "Terms of Service",
   description: "The terms governing your use of the Asia Health Link & Travel platform.",
-};
+  path: "/terms-of-service",
+});
 
 const sections = [
   {

@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
 import { Container, PageHero } from "@/components/Section";
 import { SpecialtiesBrowser } from "@/components/SpecialtiesBrowser";
 import { listSpecialties, searchHospitals } from "@/lib/api";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "Specialties",
   description: "Explore the medical specialties available through our partner hospitals in China.",
-};
+  path: "/specialties",
+});
 
 export default async function SpecialtiesPage({
   searchParams,

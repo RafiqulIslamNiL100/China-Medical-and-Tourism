@@ -1,13 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Container, PageHero } from "@/components/Section";
 import { Badge } from "@/components/Badge";
 import { blogPosts } from "@/data/hospitals";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "Blog",
   description: "Guides and insights for planning your medical trip to China.",
-};
+  path: "/blog",
+});
 
 export default function BlogIndexPage() {
   return (

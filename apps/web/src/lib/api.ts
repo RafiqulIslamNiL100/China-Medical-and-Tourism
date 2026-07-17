@@ -18,6 +18,12 @@ type RequestOptions = {
   accessToken?: string;
   idempotencyKey?: string;
   query?: Record<string, string | number | boolean | undefined>;
+  // Public, read-only content endpoints (hospitals, specialties, cities, articles,
+  // reviews) can opt into ISR-style caching by passing a revalidate window in
+  // seconds — this lets crawlers and repeat visitors hit a cached response instead
+  // of round-tripping to the API on every request. Omit for authenticated/mutating
+  // calls, which must stay "no-store" (the default) so portal data is never stale.
+  revalidate?: number;
 };
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -37,7 +43,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     method: options.method ?? "GET",
     headers,
     body: options.formData ?? (options.body !== undefined ? JSON.stringify(options.body) : undefined),
-    cache: "no-store",
+    ...(options.revalidate !== undefined
+      ? { next: { revalidate: options.revalidate } }
+      : { cache: "no-store" as const }),
   });
 
   if (res.status === 204) return undefined as T;
@@ -444,19 +452,19 @@ export function deleteDependent(accessToken: string, dependentId: string) {
 // --- Hospitals -----------------------------------------------------------
 
 export function searchHospitals(query: { city?: string; specialty?: string; limit?: number } = {}) {
-  return request<Paginated<Hospital>>("/hospitals", { query });
+  return request<Paginated<Hospital>>("/hospitals", { query, revalidate: 900 });
 }
 
 export function listSpecialties() {
-  return request<Specialty[]>("/specialties");
+  return request<Specialty[]>("/specialties", { revalidate: 3600 });
 }
 
 export function listCities() {
-  return request<City[]>("/cities");
+  return request<City[]>("/cities", { revalidate: 3600 });
 }
 
 export function getHospital(hospitalId: string) {
-  return request<Hospital>(`/hospitals/${hospitalId}`);
+  return request<Hospital>(`/hospitals/${hospitalId}`, { revalidate: 900 });
 }
 
 export function getMyHospital(accessToken: string) {
@@ -500,7 +508,7 @@ export function getHospitalReports(accessToken: string, hospitalId: string) {
 }
 
 export function listHospitalReviews(hospitalId: string) {
-  return request<Review[]>(`/hospitals/${hospitalId}/reviews`);
+  return request<Review[]>(`/hospitals/${hospitalId}/reviews`, { revalidate: 300 });
 }
 
 // --- Applications ----------------------------------------------------------
@@ -827,7 +835,7 @@ export function getAssignmentBoard(accessToken: string) {
 // --- CMS ---------------------------------------------------------------------------------------
 
 export function listArticles(category?: string) {
-  return request<Article[]>("/articles", { query: { category } });
+  return request<Article[]>("/articles", { query: { category }, revalidate: 600 });
 }
 
 export function createArticle(accessToken: string, input: { slug?: string; title: string; excerpt?: string; body: string; category?: string }) {

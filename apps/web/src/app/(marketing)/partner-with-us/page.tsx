@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
 import { Container, PageHero } from "@/components/Section";
 import { Button } from "@/components/Button";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "Partner With Us",
   description: "Join our network as a hospital, hotel, or logistics partner.",
-};
+  path: "/partner-with-us",
+});
 
 export default function PartnerWithUsPage() {
   return (

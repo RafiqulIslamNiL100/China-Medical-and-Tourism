@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Container } from "@/components/Section";
 import { Badge } from "@/components/Badge";
 import { blogPosts } from "@/data/hospitals";
+import { buildMetadata } from "@/lib/seo";
 
 export function generateStaticParams() {
   return blogPosts.map((p) => ({ slug: p.slug }));
@@ -17,7 +18,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const post = blogPosts.find((p) => p.slug === slug);
   if (!post) return {};
-  return { title: post.title, description: post.excerpt };
+  return buildMetadata({ title: post.title, description: post.excerpt, path: `/blog/${slug}` });
 }
 
 export default async function BlogPostPage({

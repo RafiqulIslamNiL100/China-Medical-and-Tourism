@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { Container } from "@/components/Section";
@@ -5,6 +6,15 @@ import { HospitalCard } from "@/components/HospitalCard";
 import { Stars } from "@/components/Stars";
 import { hospitals, specialties, testimonials } from "@/data/hospitals";
 import { listSpecialties, listCities } from "@/lib/api";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Asia Health Link & Travel — Coordinated Treatment & Visit in China",
+  description:
+    "Book world-class treatment at accredited hospitals in China, with visa support, hotel booking, and airport transfers coordinated in one place.",
+  path: "/",
+  absoluteTitle: true,
+});
 
 const steps = [
   {
@@ -26,6 +36,9 @@ const steps = [
 ];
 
 export default async function HomePage() {
+  // Keep the homepage dynamically rendered rather than statically prerendered at
+  // build time — see the matching comment in destinations/page.tsx for why.
+  await connection();
   const featured = hospitals.slice(0, 3);
   const topReviews = testimonials.slice(0, 3);
   const allSpecialties = await listSpecialties();

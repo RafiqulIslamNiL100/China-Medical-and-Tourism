@@ -1,13 +1,14 @@
-import type { Metadata } from "next";
 import { Container, PageHero } from "@/components/Section";
 import { Stars } from "@/components/Stars";
 import { Badge } from "@/components/Badge";
 import { hospitals, testimonials } from "@/data/hospitals";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "Reviews",
   description: "Verified patient reviews across our accredited partner hospitals.",
-};
+  path: "/reviews",
+});
 
 export default function ReviewsPage() {
   const avg =
