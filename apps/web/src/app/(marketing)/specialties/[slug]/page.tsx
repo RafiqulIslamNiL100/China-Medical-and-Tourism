@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Container, PageHero } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
 import { JsonLd } from "@/components/JsonLd";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { listSpecialties, listCities, searchHospitals } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 import { buildFAQPageSchema } from "@/lib/structured-data";
@@ -95,6 +96,15 @@ export default async function SpecialtyDetailPage({
   return (
     <>
       {faqs.length > 0 ? <JsonLd data={buildFAQPageSchema(faqs)} /> : null}
+      <Container className="pt-6">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Specialties", href: "/specialties" },
+            { label: specialty.name },
+          ]}
+        />
+      </Container>
       <PageHero eyebrow="Specialty" title={specialty.name} description={specialty.blurb ?? undefined} />
       <Container className="flex flex-col gap-10 py-10">
         <section>

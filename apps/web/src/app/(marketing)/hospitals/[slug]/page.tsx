@@ -7,8 +7,9 @@ import { Stars } from "@/components/Stars";
 import { Button } from "@/components/Button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { JsonLd } from "@/components/JsonLd";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { cities } from "@/data/hospitals";
-import { searchHospitals, getHospital, listHospitalReviews } from "@/lib/api";
+import { searchHospitals, getHospital, listHospitalReviews, listSpecialties } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 import { buildMedicalOrganizationSchema } from "@/lib/structured-data";
 
@@ -43,19 +44,37 @@ export default async function HospitalDetailPage({
   const hospital = await findHospitalBySlug(slug);
   if (!hospital) notFound();
 
-  const reviews = await listHospitalReviews(hospital.id);
+  const [reviews, specialties] = await Promise.all([
+    listHospitalReviews(hospital.id),
+    listSpecialties(),
+  ]);
 
   const cityLabel = cities.find((c) => c.slug === hospital.citySlug)?.name ?? hospital.citySlug;
+  const specialtyNameBySlug = new Map(specialties.map((s) => [s.slug, s.name]));
 
   return (
     <>
       <JsonLd data={buildMedicalOrganizationSchema(hospital, cityLabel)} />
       <section className="border-b border-neutral-300/70 bg-gradient-to-br from-primary-600 to-primary-700 text-white">
         <Container className="flex flex-col gap-4 py-12">
+          <Breadcrumbs
+            tone="onDark"
+            items={[
+              { label: "Home", href: "/" },
+              { label: "Hospitals", href: "/hospitals" },
+              { label: cityLabel, href: `/destinations/${hospital.citySlug}` },
+              { label: hospital.name },
+            ]}
+          />
           <VerifiedBadge label="Verified Hospital" />
           <h1 className="text-3xl font-bold sm:text-4xl">{hospital.name}</h1>
           <div className="flex flex-wrap items-center gap-4 text-primary-100">
-            <span>{cityLabel}, China</span>
+            <Link
+              href={`/destinations/${hospital.citySlug}`}
+              className="underline decoration-white/40 underline-offset-2 hover:decoration-white"
+            >
+              {cityLabel}, China
+            </Link>
             <span className="text-white">
               <Stars rating={Number(hospital.rating)} />
             </span>
@@ -97,6 +116,22 @@ export default async function HospitalDetailPage({
           <section id="overview" className="scroll-mt-32">
             <h2 className="mb-3 text-xl font-bold text-neutral-900">Overview</h2>
             <p className="text-neutral-700">{hospital.description}</p>
+            {hospital.specialtySlugs && hospital.specialtySlugs.length > 0 ? (
+              <>
+                <h3 className="mt-6 mb-2 font-bold text-neutral-900">Specialties</h3>
+                <div className="flex flex-wrap gap-2">
+                  {hospital.specialtySlugs.map((s) => (
+                    <Link
+                      key={s}
+                      href={`/specialties/${s}`}
+                      className="rounded-full border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-700 hover:border-primary-600 hover:text-primary-700"
+                    >
+                      {specialtyNameBySlug.get(s) ?? s}
+                    </Link>
+                  ))}
+                </div>
+              </>
+            ) : null}
             <h3 className="mt-6 mb-2 font-bold text-neutral-900">Facilities</h3>
             <ul className="grid gap-1.5 text-sm text-neutral-700 sm:grid-cols-2">
               {hospital.facilities.map((f) => (

@@ -5,6 +5,7 @@ import { Container } from "@/components/Section";
 import { Badge } from "@/components/Badge";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { JsonLd } from "@/components/JsonLd";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ApiError, getArticle, listArticles } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 import { fmtDate } from "@/lib/format";
@@ -44,9 +45,13 @@ export default async function BlogPostPage({
   return (
     <Container className="py-12">
       <JsonLd data={buildArticleSchema(post)} />
-      <Link href="/blog" className="text-sm font-semibold text-primary-700">
-        &larr; All articles
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: "Home", href: "/" },
+          { label: "Blog", href: "/blog" },
+          { label: post.title },
+        ]}
+      />
       <article className="mx-auto mt-6 max-w-2xl">
         {post.category ? <Badge tone="primary">{post.category}</Badge> : null}
         <h1 className="mt-3 text-3xl font-bold text-neutral-900">{post.title}</h1>

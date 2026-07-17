@@ -70,6 +70,23 @@ export function buildFAQPageSchema(faqs: { q: string; a: string }[]) {
   };
 }
 
+export type BreadcrumbItem = { label: string; href?: string };
+
+/** Shared by components/Breadcrumbs.tsx — one source of truth so the visible
+ * breadcrumb trail and its schema can never drift apart. */
+export function buildBreadcrumbListSchema(items: BreadcrumbItem[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: item.label,
+      ...(item.href ? { item: absoluteUrl(item.href) } : {}),
+    })),
+  };
+}
+
 export function buildArticleSchema(article: Article) {
   return {
     "@context": "https://schema.org",
