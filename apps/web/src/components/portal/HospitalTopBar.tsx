@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/components/Link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-client";
+import { useLocale } from "@/lib/i18n";
 import { getMyHospital, listApplications } from "@/lib/api";
 
 const mobileNavItems = [
@@ -17,6 +18,7 @@ const mobileNavItems = [
 
 export function HospitalTopBar() {
   const router = useRouter();
+  const locale = useLocale();
   const { accessToken, user, logout } = useAuth();
   const [hospitalName, setHospitalName] = useState("");
   const [staffTitle, setStaffTitle] = useState("");
@@ -35,7 +37,7 @@ export function HospitalTopBar() {
 
   function handleLogout() {
     logout();
-    router.push("/login");
+    router.push(`/${locale}/login`);
   }
 
   return (

@@ -8,8 +8,37 @@ import { SITE_URL } from "@/lib/seo";
 // revalidate windows, so this is mostly about not re-serializing the XML constantly.
 export const revalidate = 3600;
 
-function url(path: string): string {
-  return new URL(path, SITE_URL).toString();
+const LOCALES = ["en", "bn"] as const;
+
+/** Locale-prefixed absolute URL for an unprefixed app path (`/hospitals` →
+ * `https://…/en/hospitals`). The homepage path "/" maps to a bare `/en` (no
+ * trailing slash), matching where the [locale] segment actually serves it. */
+function localeUrl(locale: string, path: string): string {
+  return new URL(`/${locale}${path === "/" ? "" : path}`, SITE_URL).toString();
+}
+
+type EntryMeta = {
+  lastModified: Date;
+  changeFrequency: NonNullable<MetadataRoute.Sitemap[number]["changeFrequency"]>;
+  priority: number;
+};
+
+/** One unprefixed path in, one sitemap entry per locale out — each carrying the
+ * hreflang `alternates.languages` map (both locales plus `x-default` → English) so
+ * crawlers understand the two URLs are translations of the same page. */
+function localizedEntries(path: string, meta: EntryMeta): MetadataRoute.Sitemap {
+  const languages: Record<string, string> = {
+    "x-default": localeUrl("en", path),
+  };
+  for (const locale of LOCALES) languages[locale] = localeUrl(locale, path);
+
+  return LOCALES.map((locale) => ({
+    url: localeUrl(locale, path),
+    lastModified: meta.lastModified,
+    changeFrequency: meta.changeFrequency,
+    priority: meta.priority,
+    alternates: { languages },
+  }));
 }
 
 const staticRoutes: {
@@ -51,29 +80,49 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const now = new Date();
 
-  const entries: MetadataRoute.Sitemap = staticRoutes.map((r) => ({
-    url: url(r.path),
-    lastModified: now,
-    changeFrequency: r.changeFrequency,
-    priority: r.priority,
-  }));
+  const entries: MetadataRoute.Sitemap = staticRoutes.flatMap((r) =>
+    localizedEntries(r.path, {
+      lastModified: now,
+      changeFrequency: r.changeFrequency,
+      priority: r.priority,
+    }),
+  );
 
   for (const h of hospitalsRes.data) {
-    entries.push({ url: url(`/hospitals/${h.slug}`), lastModified: now, changeFrequency: "weekly", priority: 0.8 });
+    entries.push(
+      ...localizedEntries(`/hospitals/${h.slug}`, {
+        lastModified: now,
+        changeFrequency: "weekly",
+        priority: 0.8,
+      }),
+    );
   }
   for (const s of specialties) {
-    entries.push({ url: url(`/specialties/${s.slug}`), lastModified: now, changeFrequency: "weekly", priority: 0.7 });
+    entries.push(
+      ...localizedEntries(`/specialties/${s.slug}`, {
+        lastModified: now,
+        changeFrequency: "weekly",
+        priority: 0.7,
+      }),
+    );
   }
   for (const c of cities) {
-    entries.push({ url: url(`/destinations/${c.slug}`), lastModified: now, changeFrequency: "weekly", priority: 0.6 });
+    entries.push(
+      ...localizedEntries(`/destinations/${c.slug}`, {
+        lastModified: now,
+        changeFrequency: "weekly",
+        priority: 0.6,
+      }),
+    );
   }
   for (const a of articles) {
-    entries.push({
-      url: url(`/blog/${a.slug}`),
-      lastModified: a.publishedAt ? new Date(a.publishedAt) : now,
-      changeFrequency: "monthly",
-      priority: 0.6,
-    });
+    entries.push(
+      ...localizedEntries(`/blog/${a.slug}`, {
+        lastModified: a.publishedAt ? new Date(a.publishedAt) : now,
+        changeFrequency: "monthly",
+        priority: 0.6,
+      }),
+    );
   }
 
   return entries;

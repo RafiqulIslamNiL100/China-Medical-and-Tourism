@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/components/Link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-client";
 import { getMyHotels } from "@/lib/api";
@@ -13,7 +13,8 @@ const navItems = [
 ];
 
 export function HotelPartnerSidebar() {
-  const pathname = usePathname();
+  // Strip the locale prefix so active-state comparisons match the unprefixed nav hrefs.
+  const pathname = usePathname().replace(/^\/(en|bn)(?=\/|$)/, "") || "/";
   const { accessToken } = useAuth();
   const [hotelName, setHotelName] = useState("");
 

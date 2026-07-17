@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/components/Link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-client";
+import { useLocale } from "@/lib/i18n";
 import { listApplications } from "@/lib/api";
 import { slaRiskFor } from "@/lib/portal";
 
@@ -14,6 +15,7 @@ const mobileNavItems = [
 
 export function OpsTopBar() {
   const router = useRouter();
+  const locale = useLocale();
   const { accessToken, user, logout } = useAuth();
   const [urgentCount, setUrgentCount] = useState(0);
 
@@ -26,7 +28,7 @@ export function OpsTopBar() {
 
   function handleLogout() {
     logout();
-    router.push("/login");
+    router.push(`/${locale}/login`);
   }
 
   return (

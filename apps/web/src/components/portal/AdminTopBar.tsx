@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/components/Link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-client";
+import { useLocale } from "@/lib/i18n";
 import { listModerationQueue, listPendingReviews } from "@/lib/api";
 
 const mobileNavItems = [
@@ -19,6 +20,7 @@ const mobileNavItems = [
 
 export function AdminTopBar() {
   const router = useRouter();
+  const locale = useLocale();
   const { accessToken, user, logout } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -31,7 +33,7 @@ export function AdminTopBar() {
 
   function handleLogout() {
     logout();
-    router.push("/login");
+    router.push(`/${locale}/login`);
   }
 
   return (

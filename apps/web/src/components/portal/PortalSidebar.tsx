@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/components/Link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
@@ -17,7 +17,8 @@ const navItems = [
 ];
 
 export function PortalSidebar() {
-  const pathname = usePathname();
+  // Strip the locale prefix so active-state comparisons match the unprefixed nav hrefs.
+  const pathname = usePathname().replace(/^\/(en|bn)(?=\/|$)/, "") || "/";
 
   return (
     <aside className="hidden w-60 shrink-0 border-r border-neutral-300/70 bg-white lg:block">

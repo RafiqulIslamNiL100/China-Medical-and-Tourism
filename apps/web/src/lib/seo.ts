@@ -19,17 +19,31 @@ export const DEFAULT_DESCRIPTION =
  * explicitly here rather than relying on implicit file-convention inheritance. */
 const DEFAULT_OG_IMAGE = "/opengraph-image";
 
+const LOCALES = ["en", "bn"] as const;
+
+/** Locale-prefix an unprefixed app path: `/hospitals` → `/en/hospitals`. The
+ * homepage path "/" maps to a bare `/en` (no trailing slash), matching where the
+ * [locale] segment serves it. */
+function localePath(locale: string, path: string): string {
+  return `/${locale}${path === "/" ? "" : path}`;
+}
+
 export function buildMetadata({
   title,
   description = DEFAULT_DESCRIPTION,
   path,
+  locale = "en",
   noindex = false,
   absoluteTitle = false,
   ogImage = DEFAULT_OG_IMAGE,
 }: {
   title: string;
   description?: string;
+  /** Unprefixed app path (e.g. "/hospitals"); the locale prefix is added here. */
   path: string;
+  /** Active locale for this render — threaded in from the page's route params so
+   * the canonical/OG URLs and hreflang alternates point at the right language. */
+  locale?: string;
   noindex?: boolean;
   /** Set when `title` already includes the site name (e.g. the homepage) — bypasses
    * the root layout's title template so it isn't appended a second time. */
@@ -38,15 +52,18 @@ export function buildMetadata({
   ogImage?: string;
 }): Metadata {
   const fullTitle = title.includes(SITE_NAME) ? title : `${title} — ${SITE_NAME}`;
+  const canonical = localePath(locale, path);
+  const languages: Record<string, string> = { "x-default": localePath("en", path) };
+  for (const l of LOCALES) languages[l] = localePath(l, path);
 
   return {
     title: absoluteTitle ? { absolute: title } : title,
     description,
-    alternates: { canonical: path },
+    alternates: { canonical, languages },
     openGraph: {
       title: fullTitle,
       description,
-      url: path,
+      url: canonical,
       siteName: SITE_NAME,
       type: "website",
       images: [ogImage],
