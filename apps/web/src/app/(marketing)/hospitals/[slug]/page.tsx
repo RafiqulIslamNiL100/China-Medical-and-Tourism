@@ -6,9 +6,11 @@ import { Badge, VerifiedBadge } from "@/components/Badge";
 import { Stars } from "@/components/Stars";
 import { Button } from "@/components/Button";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { JsonLd } from "@/components/JsonLd";
 import { cities } from "@/data/hospitals";
 import { searchHospitals, getHospital, listHospitalReviews } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
+import { buildMedicalOrganizationSchema } from "@/lib/structured-data";
 
 async function findHospitalBySlug(slug: string) {
   const { data } = await searchHospitals();
@@ -47,6 +49,7 @@ export default async function HospitalDetailPage({
 
   return (
     <>
+      <JsonLd data={buildMedicalOrganizationSchema(hospital, cityLabel)} />
       <section className="border-b border-neutral-300/70 bg-gradient-to-br from-primary-600 to-primary-700 text-white">
         <Container className="flex flex-col gap-4 py-12">
           <VerifiedBadge label="Verified Hospital" />
