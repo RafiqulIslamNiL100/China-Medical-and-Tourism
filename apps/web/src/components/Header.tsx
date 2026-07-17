@@ -2,6 +2,7 @@
 
 import { Link } from "@/components/Link";
 import { Button } from "./Button";
+import { Logo } from "./Logo";
 import { useLanguage, type DictKey } from "@/lib/i18n";
 
 const navLinks: { href: string; key: DictKey }[] = [
@@ -48,9 +49,7 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-neutral-300/70 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
         <Link href="/" className="flex items-center gap-2 font-bold text-neutral-900">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600 text-sm text-white">
-            AHL
-          </span>
+          <Logo className="h-8 w-auto" />
           <span className="hidden sm:inline">Asia Health Link &amp; Travel</span>
         </Link>
 
