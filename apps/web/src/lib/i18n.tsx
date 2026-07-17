@@ -6,6 +6,7 @@ export type Lang = "en" | "bn";
 
 const dictionary = {
   en: {
+    "nav.home": "Home",
     "nav.treatments": "Treatments",
     "nav.hospitals": "Hospitals",
     "nav.destinations": "Destinations",
@@ -72,6 +73,7 @@ const dictionary = {
     "cta.button": "Get Started",
   },
   bn: {
+    "nav.home": "হোম",
     "nav.treatments": "চিকিৎসা",
     "nav.hospitals": "হাসপাতাল",
     "nav.destinations": "গন্তব্য",
