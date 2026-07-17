@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { Container } from "@/components/Section";
 import { Badge } from "@/components/Badge";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { JsonLd } from "@/components/JsonLd";
 import { ApiError, getArticle, listArticles } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 import { fmtDate } from "@/lib/format";
+import { buildArticleSchema } from "@/lib/structured-data";
 
 async function findArticle(slug: string) {
   try {
@@ -41,6 +43,7 @@ export default async function BlogPostPage({
 
   return (
     <Container className="py-12">
+      <JsonLd data={buildArticleSchema(post)} />
       <Link href="/blog" className="text-sm font-semibold text-primary-700">
         &larr; All articles
       </Link>
