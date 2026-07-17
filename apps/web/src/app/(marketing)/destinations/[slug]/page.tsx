@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Container, PageHero } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { listCities, listSpecialties, searchHospitals } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 
@@ -50,6 +51,15 @@ export default async function DestinationDetailPage({
 
   return (
     <>
+      <Container className="pt-6">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Destinations", href: "/destinations" },
+            { label: city.name },
+          ]}
+        />
+      </Container>
       <PageHero eyebrow="Destination" title={city.name} description={city.tagline ?? undefined} />
       <Container className="flex flex-col gap-10 py-10">
         <section className="grid gap-4 rounded-[10px] border border-neutral-300 bg-white p-6 shadow-sm sm:grid-cols-2">

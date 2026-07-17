@@ -4,9 +4,11 @@ import { Button } from "@/components/Button";
 import { Container } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
 import { Stars } from "@/components/Stars";
+import { Badge } from "@/components/Badge";
 import { hospitals, specialties, testimonials } from "@/data/hospitals";
-import { listSpecialties, listCities } from "@/lib/api";
+import { listSpecialties, listCities, listArticles } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
+import { fmtDate } from "@/lib/format";
 
 export const metadata = buildMetadata({
   title: "Asia Health Link & Travel — Coordinated Treatment & Visit in China",
@@ -44,6 +46,7 @@ export default async function HomePage() {
   const allSpecialties = await listSpecialties();
   const treatmentPreview = allSpecialties.slice(0, 8);
   const destinationCities = await listCities();
+  const latestArticles = (await listArticles()).slice(0, 3);
 
   return (
     <>
@@ -219,6 +222,35 @@ export default async function HomePage() {
           </div>
         </Container>
       </section>
+
+      {latestArticles.length > 0 ? (
+        <section className="py-16">
+          <Container>
+            <div className="mb-8 flex items-end justify-between gap-4">
+              <h2 className="text-2xl font-bold text-neutral-900">Latest from our blog</h2>
+              <Link href="/blog" className="text-sm font-semibold text-primary-700">
+                View all &rarr;
+              </Link>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-3">
+              {latestArticles.map((post) => (
+                <Link
+                  key={post.slug}
+                  href={`/blog/${post.slug}`}
+                  className="group flex flex-col gap-3 rounded-[10px] border border-neutral-300 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  {post.category ? <Badge tone="primary">{post.category}</Badge> : null}
+                  <h3 className="font-bold text-neutral-900 group-hover:text-primary-700">
+                    {post.title}
+                  </h3>
+                  {post.excerpt ? <p className="text-sm text-neutral-600">{post.excerpt}</p> : null}
+                  <p className="mt-auto text-xs text-neutral-500">{fmtDate(post.publishedAt)}</p>
+                </Link>
+              ))}
+            </div>
+          </Container>
+        </section>
+      ) : null}
 
       <section className="bg-primary-600 py-16">
         <Container className="flex flex-col items-center gap-4 text-center">
