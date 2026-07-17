@@ -58,39 +58,9 @@ export function roleHomePath(role: Role): string {
   }
 }
 
-export function fmtDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-export function fmtDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  return new Date(value).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export function fmtMoney(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  return `$${Number(value).toLocaleString()}`;
-}
-
-/** API CaseStatus ("UnderReview") → display label ("Under Review"). */
-export function statusLabel(status: string): string {
-  return status.replace(/([a-z])([A-Z])/g, "$1 $2");
-}
-
-const OPEN_CASE_STATUSES = new Set(["Submitted", "UnderReview", "InfoRequested"]);
-
-/** SLA target: respond within 3 business days of submission (approximated as calendar days). */
-export function slaRiskFor(submittedAt: string, status: string): "on-track" | "at-risk" | "breached" {
-  if (!OPEN_CASE_STATUSES.has(status)) return "on-track";
-  const daysOpen = (Date.now() - new Date(submittedAt).getTime()) / (24 * 60 * 60 * 1000);
-  if (daysOpen >= 3) return "breached";
-  if (daysOpen >= 2) return "at-risk";
-  return "on-track";
-}
+// Re-exported for existing portal-page call sites (import { fmtDate } from
+// "@/lib/portal") — the actual implementations live in lib/format.ts, a plain
+// module with no "use client" directive, so they can also be called directly
+// from Server Components (marketing pages), which importing them from this
+// client-tainted file would not allow.
+export { fmtDate, fmtDateTime, fmtMoney, statusLabel, slaRiskFor } from "./format";

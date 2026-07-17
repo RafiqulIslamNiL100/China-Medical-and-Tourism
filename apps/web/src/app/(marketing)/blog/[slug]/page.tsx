@@ -3,11 +3,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/Section";
 import { Badge } from "@/components/Badge";
-import { blogPosts } from "@/data/hospitals";
+import { MarkdownContent } from "@/components/MarkdownContent";
+import { ApiError, getArticle, listArticles } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
+import { fmtDate } from "@/lib/format";
 
-export function generateStaticParams() {
-  return blogPosts.map((p) => ({ slug: p.slug }));
+async function findArticle(slug: string) {
+  try {
+    return await getArticle(slug);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 export async function generateMetadata({
@@ -16,9 +23,9 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const post = blogPosts.find((p) => p.slug === slug);
+  const post = await findArticle(slug);
   if (!post) return {};
-  return buildMetadata({ title: post.title, description: post.excerpt, path: `/blog/${slug}` });
+  return buildMetadata({ title: post.title, description: post.excerpt ?? undefined, path: `/blog/${slug}` });
 }
 
 export default async function BlogPostPage({
@@ -27,10 +34,10 @@ export default async function BlogPostPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const post = blogPosts.find((p) => p.slug === slug);
+  const [post, allArticles] = await Promise.all([findArticle(slug), listArticles()]);
   if (!post) notFound();
 
-  const related = blogPosts.filter((p) => p.slug !== post.slug).slice(0, 2);
+  const related = allArticles.filter((p) => p.slug !== post.slug).slice(0, 2);
 
   return (
     <Container className="py-12">
@@ -38,20 +45,11 @@ export default async function BlogPostPage({
         &larr; All articles
       </Link>
       <article className="mx-auto mt-6 max-w-2xl">
-        <Badge tone="primary">{post.category}</Badge>
+        {post.category ? <Badge tone="primary">{post.category}</Badge> : null}
         <h1 className="mt-3 text-3xl font-bold text-neutral-900">{post.title}</h1>
-        <p className="mt-2 text-sm text-neutral-500">
-          {post.author} &middot; {new Date(post.date).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}{" "}
-          &middot; {post.readTime}
-        </p>
-        <div className="mt-6 flex flex-col gap-4 text-neutral-700">
-          {post.body.map((para, i) => (
-            <p key={i}>{para}</p>
-          ))}
+        <p className="mt-2 text-sm text-neutral-500">{fmtDate(post.publishedAt)}</p>
+        <div className="mt-6">
+          <MarkdownContent>{post.body}</MarkdownContent>
         </div>
       </article>
 
