@@ -1,14 +1,23 @@
-import type { Metadata } from "next";
+import { connection } from "next/server";
 import Link from "next/link";
 import { Container, PageHero } from "@/components/Section";
 import { listCities } from "@/lib/api";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "Destinations",
   description: "Explore our partner destination cities across Asia.",
-};
+  path: "/destinations",
+});
 
 export default async function DestinationsPage() {
+  // Keep this route dynamically (per-request) rendered rather than statically
+  // prerendered at build time — the underlying listCities() fetch still uses its
+  // own `revalidate` window (see lib/api.ts), so this doesn't lose caching, it just
+  // avoids requiring a live backend to be reachable during `next build`/CI/Vercel
+  // builds, matching how /hospitals and /specialties already behave (they read
+  // searchParams, which has the same effect).
+  await connection();
   const cities = await listCities();
 
   return (

@@ -1,14 +1,15 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Container, PageHero } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
 import { listCities, listSpecialties, searchHospitals } from "@/lib/api";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "Find a Hospital",
   description:
     "Browse accredited partner hospitals in Beijing, Shanghai, Guangzhou, Xi'an, and beyond by specialty and city.",
-};
+  path: "/hospitals",
+});
 
 export default async function HospitalsPage({
   searchParams,

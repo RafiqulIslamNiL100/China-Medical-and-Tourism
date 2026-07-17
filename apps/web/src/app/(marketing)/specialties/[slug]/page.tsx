@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Container, PageHero } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
 import { listSpecialties, listCities, searchHospitals } from "@/lib/api";
+import { buildMetadata } from "@/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -13,7 +14,11 @@ export async function generateMetadata({
   const specialties = await listSpecialties();
   const specialty = specialties.find((s) => s.slug === slug);
   if (!specialty) return {};
-  return { title: specialty.name, description: specialty.blurb ?? undefined };
+  return buildMetadata({
+    title: specialty.name,
+    description: specialty.blurb ?? undefined,
+    path: `/specialties/${slug}`,
+  });
 }
 
 const faqBySpecialty: Record<string, { q: string; a: string }[]> = {

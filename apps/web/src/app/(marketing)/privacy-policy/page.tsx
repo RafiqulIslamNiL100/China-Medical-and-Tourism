@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { Container, PageHero } from "@/components/Section";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "Privacy Policy",
   description: "How Asia Health Link & Travel collects, uses, and protects your information.",
-};
+  path: "/privacy-policy",
+});
 
 const sections = [
   {

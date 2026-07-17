@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
 import { Container, PageHero } from "@/components/Section";
 import { Button } from "@/components/Button";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "How It Works",
   description: "The full patient journey, from first inquiry to your flight home.",
-};
+  path: "/how-it-works",
+});
 
 const steps = [
   {

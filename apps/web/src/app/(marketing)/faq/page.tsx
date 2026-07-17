@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { Container, PageHero } from "@/components/Section";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: "FAQ",
   description: "Answers to common questions about applying, visas, payments, and travel.",
-};
+  path: "/faq",
+});
 
 const faqGroups = [
   {
