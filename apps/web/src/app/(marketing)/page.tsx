@@ -3,12 +3,14 @@ import Link from "next/link";
 import { Button } from "@/components/Button";
 import { Container } from "@/components/Section";
 import { HospitalCard } from "@/components/HospitalCard";
+import { TreatmentsSearchInput } from "@/components/TreatmentsSearchInput";
 import { Stars } from "@/components/Stars";
 import { Badge } from "@/components/Badge";
 import { hospitals, specialties, testimonials } from "@/data/hospitals";
 import { listSpecialties, listCities, listArticles } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 import { fmtDate } from "@/lib/format";
+import { T } from "@/lib/i18n";
 
 export const metadata = buildMetadata({
   title: "Asia Health Link & Travel — Coordinated Treatment & Visit in China",
@@ -18,23 +20,11 @@ export const metadata = buildMetadata({
   absoluteTitle: true,
 });
 
-const steps = [
-  {
-    title: "Apply",
-    body: "Tell us your condition and preferred hospital. No account required to get started.",
-  },
-  {
-    title: "Get Matched",
-    body: "A hospital reviews your case and sends back a personalized treatment plan.",
-  },
-  {
-    title: "Travel & Treat",
-    body: "We coordinate your visa, hotel, and airport transfer around your treatment dates.",
-  },
-  {
-    title: "Recover",
-    body: "Your case manager stays with you through discharge and follow-up care.",
-  },
+const steps: { titleKey: DictKey; bodyKey: DictKey }[] = [
+  { titleKey: "howItWorks.apply.title", bodyKey: "howItWorks.apply.body" },
+  { titleKey: "howItWorks.matched.title", bodyKey: "howItWorks.matched.body" },
+  { titleKey: "howItWorks.travel.title", bodyKey: "howItWorks.travel.body" },
+  { titleKey: "howItWorks.recover.title", bodyKey: "howItWorks.recover.body" },
 ];
 
 export default async function HomePage() {
@@ -54,33 +44,31 @@ export default async function HomePage() {
         <Container className="grid gap-10 py-16 lg:grid-cols-[1.2fr_1fr] lg:items-center lg:py-24">
           <div className="flex flex-col gap-6">
             <span className="w-fit rounded-full bg-primary-600 px-3 py-1 text-xs font-bold text-white">
-              15+ accredited partner hospitals
+              <T k="hero.badge" />
             </span>
             <h1 className="text-4xl font-bold text-neutral-900 sm:text-5xl">
-              World-class treatment in China, fully coordinated.
+              <T k="hero.title" />
             </h1>
             <p className="max-w-lg text-lg text-neutral-700">
-              From your first inquiry to your flight home — hospital booking, visa
-              support, hotels, and airport transfers, coordinated by one dedicated case
-              manager.
+              <T k="hero.description" />
             </p>
             <div className="flex flex-wrap gap-3">
               <Button href="/app/apply" size="lg">
-                Start Application
+                <T k="hero.startApplication" />
               </Button>
               <Button href="/how-it-works" size="lg" variant="secondary">
-                How It Works
+                <T k="hero.howItWorks" />
               </Button>
             </div>
             <div className="flex flex-wrap gap-6 pt-4 text-sm text-neutral-500">
               <span>
-                <strong className="text-neutral-900">500+</strong> patients served
+                <strong className="text-neutral-900">500+</strong> <T k="hero.patientsServed" />
               </span>
               <span>
-                <strong className="text-neutral-900">10+</strong> destination cities
+                <strong className="text-neutral-900">10+</strong> <T k="hero.destinationCities" />
               </span>
               <span>
-                <strong className="text-neutral-900">4.7+</strong> average rating
+                <strong className="text-neutral-900">4.7+</strong> <T k="hero.averageRating" />
               </span>
             </div>
           </div>
@@ -103,27 +91,24 @@ export default async function HomePage() {
         <Container>
           <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-neutral-900">Treatments</h2>
+              <h2 className="text-2xl font-bold text-neutral-900">
+                <T k="treatments.heading" />
+              </h2>
               <p className="text-neutral-500">
-                {allSpecialties.length} specialties across our accredited hospital network.
+                <T k="treatments.subtitle" vars={{ count: allSpecialties.length }} />
               </p>
             </div>
             <Link href="/specialties" className="text-sm font-semibold text-primary-700">
-              View all &rarr;
+              <T k="treatments.viewAll" />
             </Link>
           </div>
           <form action="/specialties" className="mb-8 flex max-w-md gap-2">
-            <input
-              type="text"
-              name="q"
-              placeholder="Search treatments (e.g. cardiology, IVF, neurosurgery)"
-              className="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-primary-600"
-            />
+            <TreatmentsSearchInput />
             <button
               type="submit"
               className="rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
             >
-              Search
+              <T k="treatments.searchButton" />
             </button>
           </form>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -145,13 +130,15 @@ export default async function HomePage() {
         <Container>
           <div className="mb-8 flex items-end justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-neutral-900">Featured hospitals</h2>
+              <h2 className="text-2xl font-bold text-neutral-900">
+                <T k="hospitals.heading" />
+              </h2>
               <p className="text-neutral-500">
-                Accredited partners across Beijing, Shanghai, and Guangzhou.
+                <T k="hospitals.subtitle" />
               </p>
             </div>
             <Link href="/hospitals" className="text-sm font-semibold text-primary-700">
-              View all &rarr;
+              <T k="hospitals.viewAll" />
             </Link>
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
