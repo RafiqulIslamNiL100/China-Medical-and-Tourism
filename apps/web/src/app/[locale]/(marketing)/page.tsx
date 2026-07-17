@@ -7,8 +7,8 @@ import { HospitalCard } from "@/components/HospitalCard";
 import { TreatmentsSearchInput } from "@/components/TreatmentsSearchInput";
 import { Stars } from "@/components/Stars";
 import { Badge } from "@/components/Badge";
-import { hospitals, specialties, testimonials } from "@/data/hospitals";
-import { listSpecialties, listCities, listArticles } from "@/lib/api";
+import { specialties, testimonials } from "@/data/hospitals";
+import { listSpecialties, listCities, listArticles, searchHospitals } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 import { fmtDate } from "@/lib/format";
 import { T, type DictKey } from "@/lib/i18n";
@@ -40,12 +40,36 @@ export default async function HomePage() {
   // Keep the homepage dynamically rendered rather than statically prerendered at
   // build time — see the matching comment in destinations/page.tsx for why.
   await connection();
-  const featured = hospitals.slice(0, 3);
   const topReviews = testimonials.slice(0, 3);
   const allSpecialties = await listSpecialties();
   const treatmentPreview = allSpecialties.slice(0, 8);
   const destinationCities = await listCities();
   const latestArticles = (await listArticles()).slice(0, 3);
+
+  const { data: hospitalResults } = await searchHospitals({ limit: 100 });
+  const cityNameBySlug = new Map(destinationCities.map((c) => [c.slug, c.name]));
+  const specialtyNameBySlug = new Map(allSpecialties.map((s) => [s.slug, s.name]));
+  // The First Affiliated Hospital of Xi'an Jiaotong University is our flagship
+  // partner with a fully verified rich profile — always lead with it.
+  const featured = [...hospitalResults]
+    .sort((a, b) =>
+      a.slug === "first-affiliated-hospital-xjtu"
+        ? -1
+        : b.slug === "first-affiliated-hospital-xjtu"
+          ? 1
+          : 0,
+    )
+    .slice(0, 3)
+    .map((h) => ({
+      slug: h.slug,
+      name: h.name,
+      cityLabel: cityNameBySlug.get(h.citySlug) ?? h.citySlug,
+      specialties: (h.specialtySlugs ?? [])
+        .slice(0, 2)
+        .map((slug) => specialtyNameBySlug.get(slug) ?? slug),
+      rating: Number(h.rating),
+      reviewCount: h.reviewCount,
+    }));
 
   return (
     <>
