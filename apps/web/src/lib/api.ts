@@ -838,6 +838,10 @@ export function listArticles(category?: string) {
   return request<Article[]>("/articles", { query: { category }, revalidate: 600 });
 }
 
+export function getArticle(slug: string) {
+  return request<Article>(`/articles/${slug}`, { revalidate: 600 });
+}
+
 export function createArticle(accessToken: string, input: { slug?: string; title: string; excerpt?: string; body: string; category?: string }) {
   return request<Article>("/articles", { method: "POST", body: input, accessToken });
 }
