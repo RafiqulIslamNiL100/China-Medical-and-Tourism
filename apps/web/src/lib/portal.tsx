@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-client";
+import { useLocale } from "@/lib/i18n";
 import type { Role } from "@/lib/api";
 
 /**
@@ -13,11 +14,12 @@ import type { Role } from "@/lib/api";
  */
 export function RequireRole({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
   const router = useRouter();
+  const locale = useLocale();
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [loading, user, router]);
+    if (!loading && !user) router.push(`/${locale}/login`);
+  }, [loading, user, router, locale]);
 
   if (loading || !user) {
     return <p className="p-8 text-sm text-neutral-500">Loading…</p>;

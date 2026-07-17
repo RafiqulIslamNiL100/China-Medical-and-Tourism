@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Link } from "@/components/Link";
 import { Button } from "@/components/Button";
 import {
   searchHospitals,
@@ -14,6 +14,7 @@ import {
   type Specialty,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-client";
+import { useLocale } from "@/lib/i18n";
 
 const steps = ["Specialty & Hospital", "Preferred Dates", "Medical History", "Documents", "Review & Submit"];
 
@@ -29,6 +30,7 @@ const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 
 export function ApplicationWizard() {
   const router = useRouter();
+  const locale = useLocale();
   const { accessToken } = useAuth();
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -95,7 +97,7 @@ export function ApplicationWizard() {
 
   async function handleSubmit() {
     if (!accessToken) {
-      router.push("/login");
+      router.push(`/${locale}/login`);
       return;
     }
     setSubmitError(null);

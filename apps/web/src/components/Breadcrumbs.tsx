@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/components/Link";
 import { JsonLd } from "./JsonLd";
 import { buildBreadcrumbListSchema, type BreadcrumbItem } from "@/lib/structured-data";
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/components/Link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-client";
+import { useLocale } from "@/lib/i18n";
 import { listNotifications, getMyPatientProfile } from "@/lib/api";
 
 const mobileNavItems = [
@@ -19,6 +20,7 @@ const mobileNavItems = [
 
 export function PortalTopBar() {
   const router = useRouter();
+  const locale = useLocale();
   const { accessToken, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [initials, setInitials] = useState("··");
@@ -43,7 +45,7 @@ export function PortalTopBar() {
 
   function handleLogout() {
     logout();
-    router.push("/login");
+    router.push(`/${locale}/login`);
   }
 
   return (

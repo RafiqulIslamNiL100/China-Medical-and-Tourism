@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/components/Link";
 import { useLanguage, type DictKey } from "@/lib/i18n";
 
 const columns: { titleKey: DictKey; links: { href: string; key: DictKey }[] }[] = [

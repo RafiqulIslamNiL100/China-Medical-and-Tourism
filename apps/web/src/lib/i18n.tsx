@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 export type Lang = "en" | "bn";
 
@@ -140,16 +140,6 @@ const dictionary = {
 
 export type DictKey = keyof typeof dictionary.en;
 
-type LanguageContextValue = {
-  lang: Lang;
-  setLang: (l: Lang) => void;
-  t: (key: DictKey, vars?: Record<string, string | number>) => string;
-};
-
-const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
-
-const STORAGE_KEY = "ahl.lang";
-
 function translate(lang: Lang, key: DictKey, vars?: Record<string, string | number>): string {
   let str: string = dictionary[lang][key] ?? dictionary.en[key] ?? key;
   if (vars) {
@@ -161,41 +151,35 @@ function translate(lang: Lang, key: DictKey, vars?: Record<string, string | numb
 }
 
 /**
- * Lightweight client-side language switch — deliberately not a full next-intl /
- * locale-routing setup. This translates the static site chrome (nav, hero, section
- * headings) that's actually visible on the marketing pages; DB-driven content
- * (hospital names, specialty blurbs, blog posts) stays English since translating
- * that requires real content work, not a code change. Preference persists in
- * localStorage; defaults to English.
+ * URL-based locale for the site chrome (nav, hero, section headings). The active
+ * language is derived from the first path segment (`/en/...` or `/bn/...`), which
+ * the middleware guarantees is always present — so there's no Provider, no
+ * localStorage, and no hydration flash. DB-driven content (hospital names, specialty
+ * blurbs, blog posts) stays English; translating that is content work, not a code
+ * change. Defaults to English for any unexpected path.
  */
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
+export function useLocale(): Lang {
+  const pathname = usePathname();
+  return pathname.startsWith("/bn/") || pathname === "/bn" ? "bn" : "en";
+}
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "bn") setLangState(stored);
-  }, []);
+export function useLanguage() {
+  const lang = useLocale();
+  const pathname = usePathname();
+  const router = useRouter();
 
-  useEffect(() => {
-    document.documentElement.lang = lang;
-  }, [lang]);
-
+  /** Switch language by swapping the leading locale segment of the current URL,
+   * preserving the rest of the path (so `/en/hospitals/x` → `/bn/hospitals/x`). */
   function setLang(l: Lang) {
-    setLangState(l);
-    window.localStorage.setItem(STORAGE_KEY, l);
+    const rest = pathname.replace(/^\/(en|bn)(?=\/|$)/, "");
+    router.push(`/${l}${rest || ""}`);
   }
 
   function t(key: DictKey, vars?: Record<string, string | number>): string {
     return translate(lang, key, vars);
   }
 
-  return <LanguageContext.Provider value={{ lang, setLang, t }}>{children}</LanguageContext.Provider>;
-}
-
-export function useLanguage(): LanguageContextValue {
-  const ctx = useContext(LanguageContext);
-  if (!ctx) throw new Error("useLanguage must be used within a LanguageProvider");
-  return ctx;
+  return { lang, setLang, t };
 }
 
 /** Drop-in translated text node for use inside Server Components — e.g.
